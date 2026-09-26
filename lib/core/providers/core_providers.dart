@@ -1,1 +1,25 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';\nimport 'package:shared_preferences/shared_preferences.dart';\nimport 'package:supabase_flutter/supabase_flutter.dart';\nimport '../services/local_storage_service.dart';\n\n// 1. SharedPreferences Provider (Needs to be overridden in main.dart)\nfinal sharedPreferencesProvider = Provider<SharedPreferences>((ref) {\n  throw UnimplementedError('sharedPreferencesProvider must be overridden in main.dart');\n});\n\n// 2. LocalStorageService Provider\nfinal localStorageServiceProvider = Provider<LocalStorageService>((ref) {\n  final prefs = ref.watch(sharedPreferencesProvider);\n  return LocalStorageService(prefs);\n});\n\n// 3. Supabase Client Provider\nfinal supabaseClientProvider = Provider<SupabaseClient>((ref) {\n  return Supabase.instance.client;\n});\n
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/local_storage_service.dart';
+
+import 'package:flutter/material.dart';
+
+// 1. SharedPreferences Provider (Needs to be overridden in main.dart)
+final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
+  throw UnimplementedError('sharedPreferencesProvider must be overridden in main.dart');
+});
+
+// 2. LocalStorageService Provider
+final localStorageServiceProvider = Provider<LocalStorageService>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return LocalStorageService(prefs);
+});
+
+// 3. Supabase Client Provider
+final supabaseClientProvider = Provider<SupabaseClient>((ref) {
+  return Supabase.instance.client;
+});
+
+// 4. Theme Mode Provider (Light/Dark Mode)
+final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);

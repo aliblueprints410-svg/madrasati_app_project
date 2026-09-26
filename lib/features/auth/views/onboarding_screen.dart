@@ -1,1 +1,264 @@
-import 'package:flutter/material.dart';\nimport 'package:flutter_riverpod/flutter_riverpod.dart';\nimport '../../../core/providers/core_providers.dart';\nimport '../providers/auth_providers.dart';\nimport 'teacher_login_screen.dart';\nimport '../../homework/views/grade_selection_screen.dart';\n\nclass OnboardingScreen extends ConsumerStatefulWidget {\n  const OnboardingScreen({Key? key}) : super(key: key);\n\n  @override\n  ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();\n}\n\nclass _OnboardingScreenState extends ConsumerState<OnboardingScreen> {\n  final _formKey = GlobalKey<FormState>();\n  final _codeController = TextEditingController();\n  final _nameController = TextEditingController();\n  bool _isLoading = false;\n\n  @override\n  void dispose() {\n    _codeController.dispose();\n    _nameController.dispose();\n    super.dispose();\n  }\n\n  Future<void> _submit() async {\n    if (!_formKey.currentState!.validate()) return;\n\n    setState(() => _isLoading = true);\n\n    try {\n      final authService = ref.read(authServiceProvider);\n      final school = await authService.verifySchoolCode(_codeController.text.trim());\n\n      if (school != null) {\n        // School found, save locally\n        final localStorage = ref.read(localStorageServiceProvider);\n        await localStorage.saveSchoolCode(school.id); // Save ID instead of code for queries\n        await localStorage.saveStudentName(_nameController.text.trim());\n\n        if (!mounted) return;\n        // Navigate to Grade Selection\n        ScaffoldMessenger.of(context).showSnackBar(\n          SnackBar(content: Text('تم الدخول بنجاح لمدرسة: ${school.name}')),\n        );\n        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GradeSelectionScreen()));\n      } else {\n        if (!mounted) return;\n        ScaffoldMessenger.of(context).showSnackBar(\n          const SnackBar(content: Text('كود المدرسة غير صحيح!'), backgroundColor: Colors.red),\n        );\n      }\n    } catch (e) {\n      if (!mounted) return;\n      ScaffoldMessenger.of(context).showSnackBar(\n        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),\n      );\n    } finally {\n      if (mounted) {\n        setState(() => _isLoading = false);\n      }\n    }\n  }\n\n  @override\n  Widget build(BuildContext context) {\n    return Scaffold(\n      appBar: AppBar(\n        title: const Text('أهلاً بك في التطبيق المدرسي'),\n        centerTitle: true,\n      ),\n      body: Center(\n        child: SingleChildScrollView(\n          padding: const EdgeInsets.all(24.0),\n          child: Form(\n            key: _formKey,\n            child: Column(\n              mainAxisAlignment: MainAxisAlignment.center,\n              children: [\n                const Icon(Icons.school, size: 100, color: Colors.blue),\n                const SizedBox(height: 32),\n                TextFormField(\n                  controller: _nameController,\n                  decoration: const InputDecoration(\n                    labelText: 'الاسم الثلاثي للطالب',\n                    border: OutlineInputBorder(),\n                    prefixIcon: Icon(Icons.person),\n                  ),\n                  validator: (value) {\n                    if (value == null || value.trim().isEmpty) {\n                      return 'يرجى إدخال الاسم الثلاثي';\n                    }\n                    return null;\n                  },\n                ),\n                const SizedBox(height: 16),\n                TextFormField(\n                  controller: _codeController,\n                  decoration: const InputDecoration(\n                    labelText: 'كود المدرسة (اسأل الإدارة عنه)',\n                    border: OutlineInputBorder(),\n                    prefixIcon: Icon(Icons.qr_code),\n                  ),\n                  validator: (value) {\n                    if (value == null || value.trim().isEmpty) {\n                      return 'يرجى إدخال كود المدرسة';\n                    }\n                    return null;\n                  },\n                ),\n                const SizedBox(height: 32),\n                SizedBox(\n                  width: double.infinity,\n                  height: 50,\n                  child: ElevatedButton(\n                    onPressed: _isLoading ? null : _submit,\n                    child: _isLoading\n                        ? const CircularProgressIndicator(color: Colors.white)\n                        : const Text('دخول كطالب', style: TextStyle(fontSize: 18)),\n                  ),\n                ),\n                const SizedBox(height: 24),\n                TextButton(\n                  onPressed: () {\n                    Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherLoginScreen()));\n                  },\n                  child: const Text('دخول للإدارة والمعلمين'),\n                )\n              ],\n            ),\n          ),\n        ),\n      ),\n    );\n  }\n}\n
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers/core_providers.dart';
+import '../../../core/services/notification_service.dart';
+import '../../../core/theme/app_colors.dart';
+import '../providers/auth_providers.dart';
+import 'teacher_login_screen.dart';
+import '../../homework/views/grade_selection_screen.dart';
+
+class OnboardingScreen extends ConsumerStatefulWidget {
+  const OnboardingScreen({Key? key}) : super(key: key);
+
+  @override
+  ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
+}
+
+class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _codeController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final authService = ref.read(authServiceProvider);
+      final school = await authService.verifySchoolCode(_codeController.text.trim());
+
+      if (school != null) {
+        final localStorage = ref.read(localStorageServiceProvider);
+        await localStorage.saveSchoolCode(school.id);
+        await localStorage.saveStudentName('طالبنا العزيز');
+        ref.read(notificationServiceProvider).subscribeToSchool(school.id);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(child: Text('أهلاً بك في: ${school.name}')),
+              ],
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GradeSelectionScreen()));
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.error_outline_rounded, color: Colors.white),
+                const SizedBox(width: 10),
+                Text('كود المدرسة غير صحيح! يرجى التأكد من الكود.'),
+              ],
+            ),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Modern Header Emblem
+                    Center(
+                      child: Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          gradient: AppColors.primaryGradient,
+                          borderRadius: BorderRadius.circular(26),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.35),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.school_rounded,
+                          size: 46,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Welcome Texts
+                    Text(
+                      'تسجيل دخول الطالب',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: isDark ? Colors.white : const Color(0xFF1E1B4B),
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'أدخل كود مدرستك للدخول السريع إلى موادك وواجباتك',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 36),
+
+                    // School Code Field Only
+                    Text(
+                      'كود المدرسة الخاص',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white70 : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _codeController,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _submit(),
+                      decoration: InputDecoration(
+                        hintText: 'أدخل الكود (مثال: SCH-1)',
+                        prefixIcon: Container(
+                          margin: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primary, size: 20),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'يرجى إدخال كود المدرسة';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Submit Button
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        backgroundColor: AppColors.primary,
+                        elevation: 4,
+                        shadowColor: AppColors.primary.withOpacity(0.4),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            )
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('دخول إلى مدرستي', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                SizedBox(width: 8),
+                                Icon(Icons.arrow_back_rounded, size: 18),
+                              ],
+                            ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Divider with Text
+                    Row(
+                      children: [
+                        Expanded(child: Divider(color: isDark ? Colors.white24 : Colors.grey.shade300)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Text(
+                            'أو',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                            ),
+                          ),
+                        ),
+                        Expanded(child: Divider(color: isDark ? Colors.white24 : Colors.grey.shade300)),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Teacher Login Button
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const TeacherLoginScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.shield_outlined, size: 20),
+                      label: const Text('بوابة المعلمين والإدارة'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        side: BorderSide(
+                          color: isDark ? Colors.white24 : AppColors.lightBorder,
+                          width: 1.5,
+                        ),
+                        foregroundColor: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -1,1 +1,37 @@
-import 'package:supabase_flutter/supabase_flutter.dart';\nimport '../models/schedule.dart';\n\nclass ScheduleService {\n  final SupabaseClient _supabase;\n\n  ScheduleService(this._supabase);\n\n  // Stream schedule for a specific class\n  Stream<Schedule?> watchSchedule(String classId) {\n    return _supabase\n        .from('schedules')\n        .stream(primaryKey: ['id'])\n        .eq('class_id', classId)\n        .map((data) {\n          if (data.isEmpty) return null;\n          return Schedule.fromJson(data.first);\n        });\n  }\n\n  // Update schedule (Teacher)\n  Future<void> updateSchedule(Schedule schedule) async {\n    try {\n      final exists = await _supabase.from('schedules').select('id').eq('class_id', schedule.classId).maybeSingle();\n      \n      if (exists != null) {\n        // Update\n        await _supabase.from('schedules').update(schedule.toJson()).eq('class_id', schedule.classId);\n      } else {\n        // Insert\n        await _supabase.from('schedules').insert(schedule.toJson());\n      }\n    } catch (e) {\n      throw Exception('فشل في حفظ الجدول: $e');\n    }\n  }\n}\n
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/schedule.dart';
+
+class ScheduleService {
+  final SupabaseClient _supabase;
+
+  ScheduleService(this._supabase);
+
+  // Stream schedule for a specific class
+  Stream<Schedule?> watchSchedule(String classId) {
+    return _supabase
+        .from('schedules')
+        .stream(primaryKey: ['id'])
+        .eq('class_id', classId)
+        .map((data) {
+          if (data.isEmpty) return null;
+          return Schedule.fromJson(data.first);
+        });
+  }
+
+  // Update schedule (Teacher)
+  Future<void> updateSchedule(Schedule schedule) async {
+    try {
+      final exists = await _supabase.from('schedules').select('id').eq('class_id', schedule.classId).maybeSingle();
+      
+      if (exists != null) {
+        // Update
+        await _supabase.from('schedules').update(schedule.toJson()).eq('class_id', schedule.classId);
+      } else {
+        // Insert
+        await _supabase.from('schedules').insert(schedule.toJson());
+      }
+    } catch (e) {
+      throw Exception('فشل في حفظ الجدول: $e');
+    }
+  }
+}

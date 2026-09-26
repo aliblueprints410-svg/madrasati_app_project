@@ -1,1 +1,40 @@
-import 'package:shared_preferences/shared_preferences.dart';\nimport '../constants/app_constants.dart';\n\nclass LocalStorageService {\n  final SharedPreferences _prefs;\n\n  LocalStorageService(this._prefs);\n\n  // School Code\n  Future<void> saveSchoolCode(String code) async {\n    await _prefs.setString(AppConstants.keySchoolCode, code);\n  }\n\n  String? getSchoolCode() {\n    return _prefs.getString(AppConstants.keySchoolCode);\n  }\n\n  // Student Name\n  Future<void> saveStudentName(String name) async {\n    await _prefs.setString(AppConstants.keyStudentName, name);\n  }\n\n  String? getStudentName() {\n    return _prefs.getString(AppConstants.keyStudentName);\n  }\n\n  // Selected Grade\n  Future<void> saveSelectedGrade(String gradeId) async {\n    await _prefs.setString(AppConstants.keySelectedGrade, gradeId);\n  }\n\n  String? getSelectedGrade() {\n    return _prefs.getString(AppConstants.keySelectedGrade);\n  }\n\n  // Clear all for testing or reset\n  Future<void> clearAll() async {\n    await _prefs.clear();\n  }\n}\n
+import 'package:shared_preferences/shared_preferences.dart';
+import '../constants/app_constants.dart';
+
+class LocalStorageService {
+  final SharedPreferences _prefs;
+
+  LocalStorageService(this._prefs);
+
+  // School Code
+  Future<void> saveSchoolCode(String code) async {
+    await _prefs.setString(AppConstants.keySchoolCode, code);
+  }
+
+  String? getSchoolCode() {
+    return _prefs.getString(AppConstants.keySchoolCode);
+  }
+
+  // Student Name
+  Future<void> saveStudentName(String name) async {
+    await _prefs.setString(AppConstants.keyStudentName, name);
+  }
+
+  String? getStudentName() {
+    return _prefs.getString(AppConstants.keyStudentName);
+  }
+
+  // Selected Grade
+  Future<void> saveSelectedGrade(String gradeId) async {
+    await _prefs.setString(AppConstants.keySelectedGrade, gradeId);
+  }
+
+  String? getSelectedGrade() {
+    return _prefs.getString(AppConstants.keySelectedGrade);
+  }
+
+  // Clear all for testing or reset
+  Future<void> clearAll() async {
+    await _prefs.clear();
+  }
+}

@@ -1,1 +1,22 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';\nimport '../../../core/providers/core_providers.dart';\nimport '../services/announcement_service.dart';\nimport '../models/announcement.dart';\nimport '../models/comment.dart';\n\n// Service Provider\nfinal announcementServiceProvider = Provider<AnnouncementService>((ref) {\n  final supabase = ref.watch(supabaseClientProvider);\n  return AnnouncementService(supabase);\n});\n\n// Stream Providers\nfinal announcementsProvider = StreamProvider.family<List<Announcement>, String>((ref, schoolId) {\n  final service = ref.watch(announcementServiceProvider);\n  return service.watchAnnouncements(schoolId);\n});\n\nfinal commentsProvider = StreamProvider.family<List<Comment>, String>((ref, announcementId) {\n  final service = ref.watch(announcementServiceProvider);\n  return service.watchComments(announcementId);\n});\n
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers/core_providers.dart';
+import '../services/announcement_service.dart';
+import '../models/announcement.dart';
+import '../models/comment.dart';
+
+// Service Provider
+final announcementServiceProvider = Provider<AnnouncementService>((ref) {
+  final supabase = ref.watch(supabaseClientProvider);
+  return AnnouncementService(supabase);
+});
+
+// Stream Providers
+final announcementsProvider = StreamProvider.family<List<Announcement>, String>((ref, schoolId) {
+  final service = ref.watch(announcementServiceProvider);
+  return service.watchAnnouncements(schoolId);
+});
+
+final commentsProvider = StreamProvider.family<List<Comment>, String>((ref, announcementId) {
+  final service = ref.watch(announcementServiceProvider);
+  return service.watchComments(announcementId);
+});

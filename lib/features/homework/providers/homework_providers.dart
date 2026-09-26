@@ -1,1 +1,34 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';\nimport '../../../core/providers/core_providers.dart';\nimport '../services/homework_service.dart';\nimport '../models/school_class.dart';\nimport '../models/subject.dart';\nimport '../models/homework.dart';\n\n// Service Provider\nfinal homeworkServiceProvider = Provider<HomeworkService>((ref) {\n  final supabase = ref.watch(supabaseClientProvider);\n  return HomeworkService(supabase);\n});\n\n// Future Providers for Classes and Subjects (Depends on selected school/class)\nfinal classesProvider = FutureProvider.family<List<SchoolClass>, String>((ref, schoolId) async {\n  final service = ref.watch(homeworkServiceProvider);\n  return service.getClasses(schoolId);\n});\n\nfinal subjectsProvider = FutureProvider.family<List<Subject>, String>((ref, classId) async {\n  final service = ref.watch(homeworkServiceProvider);\n  return service.getSubjects(classId);\n});\n\n// Stream Providers for Homework\nfinal currentHomeworkProvider = StreamProvider.family<List<Homework>, String>((ref, subjectId) {\n  final service = ref.watch(homeworkServiceProvider);\n  return service.watchCurrentHomework(subjectId);\n});\n\nfinal homeworkArchiveProvider = StreamProvider.family<List<Homework>, String>((ref, subjectId) {\n  final service = ref.watch(homeworkServiceProvider);\n  return service.watchHomeworkArchive(subjectId);\n});\n
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers/core_providers.dart';
+import '../services/homework_service.dart';
+import '../models/school_class.dart';
+import '../models/subject.dart';
+import '../models/homework.dart';
+
+// Service Provider
+final homeworkServiceProvider = Provider<HomeworkService>((ref) {
+  final supabase = ref.watch(supabaseClientProvider);
+  return HomeworkService(supabase);
+});
+
+// Future Providers for Classes and Subjects (Depends on selected school/class)
+final classesProvider = FutureProvider.family<List<SchoolClass>, String>((ref, schoolId) async {
+  final service = ref.watch(homeworkServiceProvider);
+  return service.getClasses(schoolId);
+});
+
+final subjectsProvider = FutureProvider.family<List<Subject>, String>((ref, classId) async {
+  final service = ref.watch(homeworkServiceProvider);
+  return service.getSubjects(classId);
+});
+
+// Stream Providers for Homework
+final currentHomeworkProvider = StreamProvider.family<List<Homework>, String>((ref, subjectId) {
+  final service = ref.watch(homeworkServiceProvider);
+  return service.watchCurrentHomework(subjectId);
+});
+
+final homeworkArchiveProvider = StreamProvider.family<List<Homework>, String>((ref, subjectId) {
+  final service = ref.watch(homeworkServiceProvider);
+  return service.watchHomeworkArchive(subjectId);
+});

@@ -1,1 +1,51 @@
-class Homework {\n  final String id;\n  final String subjectId;\n  final String title;\n  final String description;\n  final String? imageUrl;\n  final DateTime createdAt;\n  final bool isCurrent;\n  final bool isDeleted;\n\n  Homework({\n    required this.id,\n    required this.subjectId,\n    required this.title,\n    required this.description,\n    this.imageUrl,\n    required this.createdAt,\n    required this.isCurrent,\n    required this.isDeleted,\n  });\n\n  factory Homework.fromJson(Map<String, dynamic> json) {\n    return Homework(\n      id: json['id'] ?? '',\n      subjectId: json['subject_id'] ?? '',\n      title: json['title'] ?? '',\n      description: json['description'] ?? '',\n      imageUrl: json['image_url'],\n      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),\n      isCurrent: json['is_current'] ?? false,\n      isDeleted: json['is_deleted'] ?? false,\n    );\n  }\n\n  Map<String, dynamic> toJson() {\n    return {\n      'id': id,\n      'subject_id': subjectId,\n      'title': title,\n      'description': description,\n      'image_url': imageUrl,\n      'created_at': createdAt.toIso8601String(),\n      'is_current': isCurrent,\n      'is_deleted': isDeleted,\n    };\n  }\n}\n
+class Homework {
+  final String id;
+  final String subjectId;
+  final String title;
+  final String description;
+  final String? imageUrl;
+  final DateTime createdAt;
+  final DateTime? deadline;
+  final bool isCurrent;
+  final bool isDeleted;
+
+  Homework({
+    required this.id,
+    required this.subjectId,
+    required this.title,
+    required this.description,
+    this.imageUrl,
+    required this.createdAt,
+    this.deadline,
+    required this.isCurrent,
+    required this.isDeleted,
+  });
+
+  factory Homework.fromJson(Map<String, dynamic> json) {
+    return Homework(
+      id: json['id'] ?? '',
+      subjectId: json['subject_id'] ?? '',
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      imageUrl: json['image_url'],
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
+      deadline: json['deadline'] != null ? DateTime.parse(json['deadline']) : null,
+      isCurrent: json['is_current'] ?? false,
+      isDeleted: json['is_deleted'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'subject_id': subjectId,
+      'title': title,
+      'description': description,
+      'image_url': imageUrl,
+      'created_at': createdAt.toIso8601String(),
+      if (deadline != null) 'deadline': deadline!.toIso8601String(),
+      'is_current': isCurrent,
+      'is_deleted': isDeleted,
+    };
+  }
+}

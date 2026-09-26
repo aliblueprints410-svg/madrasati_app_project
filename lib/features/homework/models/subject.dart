@@ -1,1 +1,31 @@
-class Subject {\n  final String id;\n  final String classId;\n  final String name;\n  final String? icon;\n\n  Subject({\n    required this.id,\n    required this.classId,\n    required this.name,\n    this.icon,\n  });\n\n  factory Subject.fromJson(Map<String, dynamic> json) {\n    return Subject(\n      id: json['id'] ?? '',\n      classId: json['class_id'] ?? '',\n      name: json['name'] ?? '',\n      icon: json['icon'],\n    );\n  }\n\n  Map<String, dynamic> toJson() {\n    return {\n      'id': id,\n      'class_id': classId,\n      'name': name,\n      'icon': icon,\n    };\n  }\n}\n
+class Subject {
+  final String id;
+  final String classId;
+  final String name;
+  final String? icon;
+
+  Subject({
+    required this.id,
+    required this.classId,
+    required this.name,
+    this.icon,
+  });
+
+  factory Subject.fromJson(Map<String, dynamic> json) {
+    return Subject(
+      id: json['id'] ?? '',
+      classId: json['class_id'] ?? '',
+      name: json['name'] ?? '',
+      icon: json['icon'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'class_id': classId,
+      'name': name,
+      'icon': icon,
+    };
+  }
+}

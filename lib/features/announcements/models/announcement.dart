@@ -1,1 +1,43 @@
-class Announcement {\n  final String id;\n  final String schoolId;\n  final String title;\n  final String content;\n  final DateTime createdAt;\n  final bool priority;\n  final bool isDeleted;\n\n  Announcement({\n    required this.id,\n    required this.schoolId,\n    required this.title,\n    required this.content,\n    required this.createdAt,\n    required this.priority,\n    required this.isDeleted,\n  });\n\n  factory Announcement.fromJson(Map<String, dynamic> json) {\n    return Announcement(\n      id: json['id'] ?? '',\n      schoolId: json['school_id'] ?? '',\n      title: json['title'] ?? '',\n      content: json['content'] ?? '',\n      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),\n      priority: json['priority'] ?? false,\n      isDeleted: json['is_deleted'] ?? false,\n    );\n  }\n\n  Map<String, dynamic> toJson() {\n    return {\n      'id': id,\n      'school_id': schoolId,\n      'title': title,\n      'content': content,\n      'created_at': createdAt.toIso8601String(),\n      'priority': priority,\n      'is_deleted': isDeleted,\n    };\n  }\n}\n
+class Announcement {
+  final String id;
+  final String schoolId;
+  final String title;
+  final String content;
+  final DateTime createdAt;
+  final bool priority;
+  final bool isDeleted;
+
+  Announcement({
+    required this.id,
+    required this.schoolId,
+    required this.title,
+    required this.content,
+    required this.createdAt,
+    required this.priority,
+    required this.isDeleted,
+  });
+
+  factory Announcement.fromJson(Map<String, dynamic> json) {
+    return Announcement(
+      id: json['id'] ?? '',
+      schoolId: json['school_id'] ?? '',
+      title: json['title'] ?? '',
+      content: json['content'] ?? '',
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
+      priority: json['priority'] ?? false,
+      isDeleted: json['is_deleted'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'title': title,
+      'content': content,
+      'created_at': createdAt.toIso8601String(),
+      'priority': priority,
+      'is_deleted': isDeleted,
+    };
+  }
+}

@@ -1,1 +1,46 @@
-import 'package:supabase_flutter/supabase_flutter.dart';\nimport '../models/school.dart';\n\nclass AuthService {\n  final SupabaseClient _supabase;\n\n  AuthService(this._supabase);\n\n  // Check if school code exists and is valid\n  Future<School?> verifySchoolCode(String code) async {\n    try {\n      final response = await _supabase\n          .from('schools')\n          .select()\n          .eq('school_code', code)\n          .maybeSingle();\n          \n      if (response != null) {\n        return School.fromJson(response);\n      }\n      return null;\n    } catch (e) {\n      throw Exception('فشل في التحقق من كود المدرسة: $e');\n    }\n  }\n\n  // Teacher Login\n  Future<AuthResponse> loginTeacher(String email, String password) async {\n    try {\n      return await _supabase.auth.signInWithPassword(\n        email: email,\n        password: password,\n      );\n    } catch (e) {\n      throw Exception('فشل تسجيل الدخول. تأكد من البريد وكلمة المرور.');\n    }\n  }\n\n  // Teacher Logout\n  Future<void> logout() async {\n    await _supabase.auth.signOut();\n  }\n\n  // Get current user (Teacher)\n  User? get currentUser => _supabase.auth.currentUser;\n}\n
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/school.dart';
+
+class AuthService {
+  final SupabaseClient _supabase;
+
+  AuthService(this._supabase);
+
+  // Check if school code exists and is valid
+  Future<School?> verifySchoolCode(String code) async {
+    try {
+      final response = await _supabase
+          .from('schools')
+          .select()
+          .eq('school_code', code)
+          .maybeSingle();
+          
+      if (response != null) {
+        return School.fromJson(response);
+      }
+      return null;
+    } catch (e) {
+      throw Exception('فشل في التحقق من كود المدرسة: $e');
+    }
+  }
+
+  // Teacher Login
+  Future<AuthResponse> loginTeacher(String email, String password) async {
+    try {
+      return await _supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+    } catch (e) {
+      throw Exception('فشل تسجيل الدخول. تأكد من البريد وكلمة المرور.');
+    }
+  }
+
+  // Teacher Logout
+  Future<void> logout() async {
+    await _supabase.auth.signOut();
+  }
+
+  // Get current user (Teacher)
+  User? get currentUser => _supabase.auth.currentUser;
+}

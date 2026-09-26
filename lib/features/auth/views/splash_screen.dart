@@ -1,1 +1,261 @@
-import 'package:flutter/material.dart';\nimport 'package:flutter_riverpod/flutter_riverpod.dart';\nimport '../../../core/providers/core_providers.dart';\nimport 'onboarding_screen.dart';\nimport '../../homework/views/grade_selection_screen.dart';\nimport '../../homework/views/main_screen.dart';\n// import '../../teacher/views/teacher_dashboard_screen.dart';\n\nclass SplashScreen extends ConsumerStatefulWidget {\n  const SplashScreen({Key? key}) : super(key: key);\n\n  @override\n  ConsumerState<SplashScreen> createState() => _SplashScreenState();\n}\n\nclass _SplashScreenState extends ConsumerState<SplashScreen> {\n  @override\n  void initState() {\n    super.initState();\n    _checkAuth();\n  }\n\n  Future<void> _checkAuth() async {\n    // Fake delay for splash screen\n    await Future.delayed(const Duration(seconds: 2));\n    \n    if (!mounted) return;\n\n    final localStorage = ref.read(localStorageServiceProvider);\n    final supabaseAuth = ref.read(supabaseClientProvider).auth;\n\n    // Check if Teacher is logged in\n    if (supabaseAuth.currentUser != null) {\n      // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TeacherDashboardScreen()));\n      return;\n    }\n\n    // Check if Student has already set school code\n    final schoolCode = localStorage.getSchoolCode();\n    final studentName = localStorage.getStudentName();\n\n    if (schoolCode != null && schoolCode.isNotEmpty && studentName != null && studentName.isNotEmpty) {\n      final gradeId = localStorage.getSelectedGrade();\n      if (gradeId != null && gradeId.isNotEmpty) {\n        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainScreen()));\n      } else {\n        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GradeSelectionScreen()));\n      }\n    } else {\n      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OnboardingScreen()));\n    }\n  }\n\n  @override\n  Widget build(BuildContext context) {\n    return const Scaffold(\n      body: Center(\n        child: CircularProgressIndicator(),\n      ),\n    );\n  }\n}\n
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/providers/core_providers.dart';
+import '../../../core/services/notification_service.dart';
+import '../../../core/theme/app_colors.dart';
+import 'onboarding_screen.dart';
+import '../../homework/views/grade_selection_screen.dart';
+import '../../homework/views/main_screen.dart';
+import '../../teacher/views/teacher_dashboard_screen.dart';
+import '../../onboarding/views/intro_walkthrough_screen.dart';
+
+class SplashScreen extends ConsumerStatefulWidget {
+  const SplashScreen({Key? key}) : super(key: key);
+
+  @override
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends ConsumerState<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+
+    _scaleAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutBack,
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeIn,
+    );
+
+    _animationController.forward();
+    _checkAuth();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkAuth() async {
+    // Elegant delay so user enjoys the splash transition
+    await Future.delayed(const Duration(milliseconds: 2400));
+
+    if (!mounted) return;
+
+    final localStorage = ref.read(localStorageServiceProvider);
+    final supabaseAuth = ref.read(supabaseClientProvider).auth;
+
+    // Check if Teacher is logged in
+    if (supabaseAuth.currentUser != null) {
+      _navigate(const TeacherDashboardScreen());
+      return;
+    }
+
+    // Check if Student has already set school code
+    final schoolCode = localStorage.getSchoolCode();
+
+    if (schoolCode != null && schoolCode.isNotEmpty) {
+      ref.read(notificationServiceProvider).subscribeToSchool(schoolCode);
+      final gradeId = localStorage.getSelectedGrade();
+      if (gradeId != null && gradeId.isNotEmpty) {
+        _navigate(const MainScreen());
+      } else {
+        _navigate(const GradeSelectionScreen());
+      }
+    } else {
+      final prefs = ref.read(sharedPreferencesProvider);
+      final hasSeenIntro = prefs.getBool('has_seen_intro') ?? false;
+
+      if (hasSeenIntro) {
+        _navigate(const OnboardingScreen());
+      } else {
+        _navigate(const IntroWalkthroughScreen());
+      }
+    }
+  }
+
+  void _navigate(Widget screen) {
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 600),
+        pageBuilder: (context, animation, secondaryAnimation) => screen,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: isDark
+                ? [
+                    const Color(0xFF0F172A),
+                    const Color(0xFF1E1B4B),
+                    const Color(0xFF0F172A),
+                  ]
+                : [
+                    const Color(0xFFEEF2FF),
+                    const Color(0xFFE0E7FF),
+                    const Color(0xFFF8FAFC),
+                  ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Spacer(),
+
+              // Animated Glowing App Emblem
+              ScaleTransition(
+                scale: _scaleAnimation,
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Ambient Glow Rings
+                      Container(
+                        width: 160,
+                        height: 160,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.primary.withOpacity(0.15),
+                        ),
+                      ),
+                      Container(
+                        width: 130,
+                        height: 130,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.primary.withOpacity(0.25),
+                        ),
+                      ),
+                      // Core Icon Card
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          gradient: AppColors.primaryGradient,
+                          borderRadius: BorderRadius.circular(28),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.4),
+                              blurRadius: 24,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.school_rounded,
+                          size: 52,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 36),
+
+              // Title and Subtitle
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: Column(
+                  children: [
+                    Text(
+                      AppConstants.appName,
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                            color: isDark ? Colors.white : const Color(0xFF1E1B4B),
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                      ),
+                      child: Text(
+                        'منصتك التعليمية الذكية والمتكاملة',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? const Color(0xFFA5B4FC) : AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Spacer(),
+
+              // Elegant bottom progress indicator
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 32.0),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            isDark ? const Color(0xFF818CF8) : AppColors.primary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'جاري الاتصال بالنظام...',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.white54 : Colors.black45,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

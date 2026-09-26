@@ -1,1 +1,27 @@
-class School {\n  final String id;\n  final String name;\n  final String schoolCode;\n\n  School({\n    required this.id,\n    required this.name,\n    required this.schoolCode,\n  });\n\n  factory School.fromJson(Map<String, dynamic> json) {\n    return School(\n      id: json['id'] ?? '',\n      name: json['name'] ?? '',\n      schoolCode: json['school_code'] ?? '',\n    );\n  }\n\n  Map<String, dynamic> toJson() {\n    return {\n      'id': id,\n      'name': name,\n      'school_code': schoolCode,\n    };\n  }\n}\n
+class School {
+  final String id;
+  final String name;
+  final String schoolCode;
+
+  School({
+    required this.id,
+    required this.name,
+    required this.schoolCode,
+  });
+
+  factory School.fromJson(Map<String, dynamic> json) {
+    return School(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      schoolCode: json['school_code'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'school_code': schoolCode,
+    };
+  }
+}

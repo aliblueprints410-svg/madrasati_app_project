@@ -1,1 +1,75 @@
-import 'package:flutter/material.dart';\nimport 'package:flutter_dotenv/flutter_dotenv.dart';\nimport 'package:flutter_riverpod/flutter_riverpod.dart';\nimport 'package:shared_preferences/shared_preferences.dart';\nimport 'package:supabase_flutter/supabase_flutter.dart';\n\nimport 'core/constants/app_constants.dart';\nimport 'core/providers/core_providers.dart';\nimport 'features/auth/views/splash_screen.dart';\n\nvoid main() async {\n  WidgetsFlutterBinding.ensureInitialized();\n\n  // Load environment variables\n  await dotenv.load(fileName: \".env\");\n\n  // Initialize Supabase\n  await Supabase.initialize(\n    url: dotenv.env[AppConstants.supabaseUrlEnvKey] ?? '',\n    anonKey: dotenv.env[AppConstants.supabaseAnonKeyEnvKey] ?? '',\n  );\n\n  // Initialize SharedPreferences\n  final sharedPreferences = await SharedPreferences.getInstance();\n\n  runApp(\n    ProviderScope(\n      overrides: [\n        sharedPreferencesProvider.overrideWithValue(sharedPreferences),\n      ],\n      child: const SchoolApp(),\n    ),\n  );\n}\n\nclass SchoolApp extends StatelessWidget {\n  const SchoolApp({Key? key}) : super(key: key);\n\n  @override\n  Widget build(BuildContext context) {\n    return MaterialApp(\n      title: AppConstants.appName,\n      debugShowCheckedModeBanner: false,\n      theme: ThemeData(\n        primarySwatch: Colors.blue,\n        fontFamily: 'Cairo', // Will add font later\n        // Default direction to RTL for Arabic\n      ),\n      builder: (context, child) {\n        return Directionality(\n          textDirection: TextDirection.rtl,\n          child: child!,\n        );\n      },\n      home: const SplashScreen(),\n    );\n  }\n}\n
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'core/constants/app_constants.dart';
+import 'core/providers/core_providers.dart';
+import 'core/services/notification_service.dart';
+import 'core/theme/app_theme.dart';
+import 'core/widgets/confetti_celebration.dart';
+import 'features/auth/views/splash_screen.dart';
+
+void main() async {
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    print("WidgetsFlutterBinding initialized");
+
+    // Load environment variables
+    await dotenv.load(fileName: ".env");
+    print("dotenv loaded");
+
+    // Initialize Supabase
+    await Supabase.initialize(
+      url: dotenv.env[AppConstants.supabaseUrlEnvKey] ?? '',
+      anonKey: dotenv.env[AppConstants.supabaseAnonKeyEnvKey] ?? '',
+    );
+    print("Supabase initialized");
+
+    // Initialize SharedPreferences
+    final sharedPreferences = await SharedPreferences.getInstance();
+    print("SharedPreferences initialized");
+
+    // Initialize Notification Service (OneSignal)
+    await NotificationService().initialize();
+
+    runApp(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+        ],
+        child: const SchoolApp(),
+      ),
+    );
+  } catch (e, stackTrace) {
+    print("Error during initialization: $e");
+    print(stackTrace);
+  }
+}
+
+class SchoolApp extends ConsumerWidget {
+  const SchoolApp({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+
+    return MaterialApp(
+      title: AppConstants.appName,
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
+      builder: (context, child) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: ConfettiCelebrationOverlay(
+            child: child!,
+          ),
+        );
+      },
+      home: const SplashScreen(),
+    );
+  }
+}

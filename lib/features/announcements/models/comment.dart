@@ -1,1 +1,38 @@
-class Comment {\n  final String id;\n  final String announcementId;\n  final String senderName;\n  final String content;\n  final DateTime createdAt;\n\n  Comment({\n    required this.id,\n    required this.announcementId,\n    required this.senderName,\n    required this.content,\n    required this.createdAt,\n  });\n\n  factory Comment.fromJson(Map<String, dynamic> json) {\n    return Comment(\n      id: json['id'] ?? '',\n      announcementId: json['announcement_id'] ?? '',\n      senderName: json['sender_name'] ?? 'مجهول',\n      content: json['content'] ?? '',\n      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),\n    );\n  }\n\n  Map<String, dynamic> toJson() {\n    return {\n      'id': id,\n      'announcement_id': announcementId,\n      'sender_name': senderName,\n      'content': content,\n      'created_at': createdAt.toIso8601String(),\n    };\n  }\n}\n
+class Comment {
+  final String id;
+  final String announcementId;
+  final String senderName;
+  final String content;
+  final DateTime createdAt;
+
+  Comment({
+    required this.id,
+    required this.announcementId,
+    required this.senderName,
+    required this.content,
+    required this.createdAt,
+  });
+
+  factory Comment.fromJson(Map<String, dynamic> json) {
+    return Comment(
+      id: json['id'] ?? '',
+      announcementId: json['announcement_id'] ?? '',
+      senderName: json['sender_name'] ?? 'مجهول',
+      content: json['content'] ?? '',
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{
+      'announcement_id': announcementId,
+      'sender_name': senderName,
+      'content': content,
+      'created_at': createdAt.toIso8601String(),
+    };
+    if (id.isNotEmpty) {
+      map['id'] = id;
+    }
+    return map;
+  }
+}
