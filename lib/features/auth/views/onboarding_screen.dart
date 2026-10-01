@@ -123,13 +123,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Modern Header Emblem
+                    // Modern Header Emblem with Official App Logo
                     Center(
                       child: Container(
-                        width: 90,
-                        height: 90,
+                        width: 96,
+                        height: 96,
                         decoration: BoxDecoration(
-                          gradient: AppColors.primaryGradient,
                           borderRadius: BorderRadius.circular(26),
                           boxShadow: [
                             BoxShadow(
@@ -139,10 +138,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          Icons.school_rounded,
-                          size: 46,
-                          color: Colors.white,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(26),
+                          child: Image.asset(
+                            'assets/images/app_icon.png',
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                     ),

@@ -769,6 +769,67 @@ class HomeworkService {
     return list;
   }
 
+  // Get all active homework items across subjects for Teacher Dashboard
+  Future<List<Homework>> getAllActiveHomework([String? schoolId]) async {
+    String cleanSchoolId = AppConstants.defaultSchoolId;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      cleanSchoolId = AppConstants.sanitizeSchoolId(
+        schoolId ?? prefs.getString(AppConstants.keySchoolCode),
+      );
+    } catch (_) {}
+
+    final schoolSubjectIds = await _getSchoolSubjectIds(cleanSchoolId);
+    final resetTs = await _getSchoolResetTimestamp(cleanSchoolId);
+    final Map<String, Homework> active = {};
+
+    try {
+      final hwRes = await _supabase
+          .from('homework')
+          .select()
+          .eq('is_deleted', false)
+          .eq('is_current', true)
+          .order('created_at', ascending: false);
+      for (final e in (hwRes as List)) {
+        final hw = Homework.fromJson(Map<String, dynamic>.from(e as Map));
+        if (schoolSubjectIds.contains(hw.subjectId) &&
+            (resetTs == null || !hw.createdAt.toUtc().isBefore(resetTs)) &&
+            !hw.isExpired) {
+          active[hw.id] = hw;
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final sysRows = await _supabase
+          .from('announcements')
+          .select('content')
+          .like('title', '$_sysHomeworkPrefix%')
+          .order('created_at', ascending: false)
+          .limit(25);
+      for (final row in (sysRows as List)) {
+        final raw = row['content'] as String?;
+        if (raw != null && raw.isNotEmpty) {
+          final list = jsonDecode(raw) as List;
+          for (final e in list) {
+            final hw = Homework.fromJson(Map<String, dynamic>.from(e as Map));
+            if (!hw.isDeleted &&
+                hw.isCurrent &&
+                !hw.isExpired &&
+                schoolSubjectIds.contains(hw.subjectId) &&
+                (resetTs == null || !hw.createdAt.toUtc().isBefore(resetTs))) {
+              active[hw.id] = hw;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    final list = active.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
+  }
+
   // Load fallback homework list for custom subjects
   Future<List<Homework>> _getFallbackHomeworkForSubject(String subjectId) async {
     final Map<String, Homework> merged = {};
@@ -1004,12 +1065,20 @@ class HomeworkService {
     }
   }
 
-  // Delete homework (Soft delete)
-  Future<void> deleteHomework(String id) async {
+  // Delete homework (Soft delete in DB and purge from fallback / local storage)
+  Future<void> deleteHomework(String id, {String? subjectId}) async {
     try {
       await _supabase.from('homework').update({'is_deleted': true}).eq('id', id);
     } catch (e) {
-      debugPrint('[HomeworkService] deleteHomework notice: $e');
+      debugPrint('[HomeworkService] deleteHomework DB notice: $e');
+    }
+
+    if (subjectId != null && subjectId.isNotEmpty) {
+      try {
+        final existing = await _getFallbackHomeworkForSubject(subjectId);
+        final updated = existing.where((h) => h.id != id).toList();
+        await _saveFallbackHomeworkForSubject(subjectId, updated);
+      } catch (_) {}
     }
   }
 }

@@ -1,6 +1,6 @@
 class AppConstants {
   static const String appName = 'مدرستي';
-  static const String appVersion = 'v 2.0.2';
+  static const String appVersion = 'v 2.0.3';
   
   // Default School UUID (Primary School 1 - SCH-1)
   static const String defaultSchoolId = 'd581107e-2f01-4bd0-a89d-bf27f36a2574';
@@ -11,7 +11,7 @@ class AppConstants {
   static const String anaweenSchoolName = 'متوسطة العناوين للبنين';
   
   // Developer Info
-  static const String developerName = 'علي';
+  static const String developerName = 'م. علي محمد';
   static const String developerTelegramUrl = 'https://t.me/Ali_Muhammed_410';
   static const String developerTelegramUsername = '@Ali_Muhammed_410';
   static const String developerWhatsapp = '+9647749509636';

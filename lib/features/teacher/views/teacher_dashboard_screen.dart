@@ -7,6 +7,7 @@ import '../../../core/utils/arabic_day_helper.dart';
 import '../../announcements/providers/announcement_providers.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../auth/views/onboarding_screen.dart';
+import '../../homework/models/homework.dart';
 import '../../homework/providers/homework_providers.dart';
 import 'add_announcement_screen.dart';
 import 'add_homework_screen.dart';
@@ -242,6 +243,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
                             value: '${stats['homework'] ?? 0}',
                             icon: Icons.pending_actions_rounded,
                             color: const Color(0xFF3B82F6),
+                            onTap: () => _showActiveHomeworkSheet(context, ref),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -288,6 +290,16 @@ class TeacherDashboardScreen extends ConsumerWidget {
                 subtitle: 'إسناد واجبات يومية للطلاب وتحديد موعد التسليم',
                 gradient: const [Color(0xFF3B82F6), Color(0xFF2563EB)],
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddHomeworkScreen())),
+              ),
+              const SizedBox(height: 12),
+
+              _buildActionTile(
+                context,
+                icon: Icons.playlist_remove_rounded,
+                title: 'عرض وحذف التحاضير المدرسية',
+                subtitle: 'مراجعة جميع الواجبات المرسلة وإمكانية حذف أي واجب أُرسل بالخطأ',
+                gradient: const [Color(0xFFEF4444), Color(0xFFDC2626)],
+                onTap: () => _showActiveHomeworkSheet(context, ref),
               ),
               const SizedBox(height: 12),
 
@@ -436,6 +448,144 @@ class TeacherDashboardScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _showActiveHomeworkSheet(BuildContext context, WidgetRef ref) async {
+    final schoolId = AppConstants.sanitizeSchoolId(ref.read(localStorageServiceProvider).getSchoolCode());
+    final activeList = await ref.read(homeworkServiceProvider).getAllActiveHomework(schoolId);
+    if (!context.mounted) return;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: 0.65,
+              maxChildSize: 0.90,
+              minChildSize: 0.35,
+              builder: (_, controller) {
+                return Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.pending_actions_rounded, color: Color(0xFF3B82F6)),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'التحاضير النشطة (المرسلة للطلاب)',
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded),
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'يمكنك الضغط على سلة المحذوفات لحذف أي واجب تم إرساله بالخطأ فوراً.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                      const Divider(),
+                      Expanded(
+                        child: activeList.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'لا توجد تحاضير نشطة حالياً',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              )
+                            : ListView.builder(
+                                controller: controller,
+                                itemCount: activeList.length,
+                                itemBuilder: (context, index) {
+                                  final hw = activeList[index];
+                                  return Card(
+                                    color: isDark ? AppColors.darkCard : Colors.grey.shade50,
+                                    margin: const EdgeInsets.only(bottom: 10),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      side: BorderSide(
+                                        color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                                      ),
+                                    ),
+                                    child: ListTile(
+                                      leading: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(
+                                          Icons.assignment_rounded,
+                                          color: Color(0xFF3B82F6),
+                                          size: 24,
+                                        ),
+                                      ),
+                                      title: Text(
+                                        hw.title,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      ),
+                                      subtitle: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            ArabicDayHelper.formatDescriptionDatesToDayNames(hw.description),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontSize: 12),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            hw.deadline != null
+                                                ? '📅 موعد التسليم: ${ArabicDayHelper.formatFullDayDateTime(hw.deadline!)}'
+                                                : 'نشر في: ${ArabicDayHelper.formatDayAndDate(hw.createdAt)}',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: Color(0xFF3B82F6),
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      trailing: IconButton(
+                                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                                        tooltip: 'حذف هذا الواجب',
+                                        onPressed: () {
+                                          _confirmDeleteHomework(context, ref, hw, () {
+                                            setSheetState(() {
+                                              activeList.removeWhere((item) => item.id == hw.id);
+                                            });
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _showCompletedHomeworkSheet(BuildContext context, WidgetRef ref) async {
     final schoolId = AppConstants.sanitizeSchoolId(ref.read(localStorageServiceProvider).getSchoolCode());
     final completedList = await ref.read(homeworkServiceProvider).getAllCompletedHomework(schoolId);
@@ -450,113 +600,204 @@ class TeacherDashboardScreen extends ConsumerWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.55,
-          maxChildSize: 0.85,
-          minChildSize: 0.35,
-          builder: (_, controller) {
-            return Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: 0.55,
+              maxChildSize: 0.85,
+              minChildSize: 0.35,
+              builder: (_, controller) {
+                return Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.task_alt_rounded, color: AppColors.success),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'التحاضير المنتهية والمكتملة',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
+                      Row(
+                        children: [
+                          const Icon(Icons.task_alt_rounded, color: AppColors.success),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'التحاضير المنتهية والمكتملة',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded),
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () => Navigator.pop(ctx),
+                      const Divider(),
+                      Expanded(
+                        child: completedList.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'لا توجد تحاضير منتهية الوقت حتى الآن',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              )
+                            : ListView.builder(
+                                controller: controller,
+                                itemCount: completedList.length,
+                                itemBuilder: (context, index) {
+                                  final hw = completedList[index];
+                                  return Card(
+                                    color: isDark ? AppColors.darkCard : Colors.grey.shade50,
+                                    margin: const EdgeInsets.only(bottom: 10),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      side: BorderSide(
+                                        color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                                      ),
+                                    ),
+                                    child: ListTile(
+                                      leading: const Icon(
+                                        Icons.timer_off_rounded,
+                                        color: AppColors.success,
+                                      ),
+                                      title: Text(
+                                        hw.title,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      ),
+                                      subtitle: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            ArabicDayHelper.formatDescriptionDatesToDayNames(hw.description),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontSize: 12),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            hw.deadline != null
+                                                ? ArabicDayHelper.formatFullDayDateTime(hw.deadline!)
+                                                : ArabicDayHelper.formatDayAndDate(hw.createdAt),
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.success.withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: const Text(
+                                              'انتهى ⏰',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.success,
+                                              ),
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+                                            tooltip: 'حذف',
+                                            onPressed: () {
+                                              _confirmDeleteHomework(context, ref, hw, () {
+                                                setSheetState(() {
+                                                  completedList.removeWhere((item) => item.id == hw.id);
+                                                });
+                                              });
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                       ),
                     ],
                   ),
-                  const Divider(),
-                  Expanded(
-                    child: completedList.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'لا توجد تحاضير منتهية الوقت حتى الآن',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          )
-                        : ListView.builder(
-                            controller: controller,
-                            itemCount: completedList.length,
-                            itemBuilder: (context, index) {
-                              final hw = completedList[index];
-                              return Card(
-                                color: isDark ? AppColors.darkCard : Colors.grey.shade50,
-                                margin: const EdgeInsets.only(bottom: 10),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  side: BorderSide(
-                                    color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-                                  ),
-                                ),
-                                child: ListTile(
-                                  leading: const Icon(
-                                    Icons.timer_off_rounded,
-                                    color: AppColors.success,
-                                  ),
-                                  title: Text(
-                                    hw.title,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        ArabicDayHelper.formatDescriptionDatesToDayNames(hw.description),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        hw.deadline != null
-                                            ? ArabicDayHelper.formatFullDayDateTime(hw.deadline!)
-                                            : ArabicDayHelper.formatDayAndDate(hw.createdAt),
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: AppColors.primary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  trailing: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.success.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Text(
-                                      'انتهى الواجب ⏰',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.success,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
+                );
+              },
             );
           },
         );
       },
+    );
+  }
+
+  void _confirmDeleteHomework(
+    BuildContext context,
+    WidgetRef ref,
+    Homework hw,
+    VoidCallback onDeleted,
+  ) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever_rounded, color: Colors.red, size: 26),
+            SizedBox(width: 8),
+            Text(
+              'حذف التحضير المدرسي',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+            ),
+          ],
+        ),
+        content: Text(
+          'هل أنت متأكد من حذف تحضير "${hw.title}"؟\n\nسيتم إلغاؤه واختفاؤه فوراً من عند جميع الطلاب.',
+          style: const TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              try {
+                await ref
+                    .read(homeworkServiceProvider)
+                    .deleteHomework(hw.id, subjectId: hw.subjectId);
+                ref.invalidate(teacherStatsProvider);
+                ref.invalidate(currentHomeworkProvider(hw.subjectId));
+                ref.invalidate(homeworkArchiveProvider(hw.subjectId));
+                onDeleted();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('تم حذف التحضير بنجاح واختفائه من هواتف الطلاب! 🗑️'),
+                      backgroundColor: AppColors.success,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('فشل في حذف التحضير: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('نعم، حذف الواجب'),
+          ),
+        ],
+      ),
     );
   }
 
