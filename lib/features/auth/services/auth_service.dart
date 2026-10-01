@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/constants/app_constants.dart';
 import '../models/school.dart';
 
 class AuthService {
@@ -12,8 +13,16 @@ class AuthService {
 
   // Check if school code exists and is valid (case-insensitive)
   Future<School?> verifySchoolCode(String code) async {
+    final cleanCode = code.trim();
+    if (cleanCode.toUpperCase() == AppConstants.anaweenSchoolCode) {
+      return const School(
+        id: AppConstants.anaweenSchoolId,
+        name: AppConstants.anaweenSchoolName,
+        schoolCode: AppConstants.anaweenSchoolCode,
+      );
+    }
+
     try {
-      final cleanCode = code.trim();
       final response = await _supabase
           .from('schools')
           .select()
@@ -25,15 +34,30 @@ class AuthService {
       }
       return null;
     } catch (e) {
+      if (cleanCode.toUpperCase() == AppConstants.anaweenSchoolCode) {
+        return const School(
+          id: AppConstants.anaweenSchoolId,
+          name: AppConstants.anaweenSchoolName,
+          schoolCode: AppConstants.anaweenSchoolCode,
+        );
+      }
       throw Exception('فشل في التحقق من كود المدرسة: $e');
     }
   }
 
   // Fetch school details by UUID or school code
   Future<School?> getSchoolById(String schoolIdOrCode) async {
+    final clean = schoolIdOrCode.trim();
+    if (clean.isEmpty) return null;
+    if (clean == AppConstants.anaweenSchoolId || clean.toUpperCase() == AppConstants.anaweenSchoolCode) {
+      return const School(
+        id: AppConstants.anaweenSchoolId,
+        name: AppConstants.anaweenSchoolName,
+        schoolCode: AppConstants.anaweenSchoolCode,
+      );
+    }
+
     try {
-      final clean = schoolIdOrCode.trim();
-      if (clean.isEmpty) return null;
       final byId = await _supabase
           .from('schools')
           .select()

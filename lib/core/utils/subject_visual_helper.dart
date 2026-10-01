@@ -56,13 +56,24 @@ class SubjectVisualHelper {
       return Icons.calculate_rounded;
     }
 
-    // 4. العلوم والفيزياء والكيمياء والأحياء
+    // 4. الأحياء
+    if (s.contains('أحياء') || s.contains('احياء') || s.contains('bio')) {
+      return Icons.biotech_rounded;
+    }
+
+    // 5. الفيزياء
+    if (s.contains('فيزياء') || s.contains('physics')) {
+      return Icons.bolt_rounded;
+    }
+
+    // 6. الكيمياء
+    if (s.contains('كيمياء') || s.contains('chemistry')) {
+      return Icons.science_rounded;
+    }
+
+    // 7. العلوم العامة والبيئة
     if (s.contains('علوم') ||
         s.contains('علم') ||
-        s.contains('كيمياء') ||
-        s.contains('فيزياء') ||
-        s.contains('أحياء') ||
-        s.contains('احياء') ||
         s.contains('طبيعيات') ||
         s.contains('science') ||
         s.contains('مختبر')) {
@@ -176,13 +187,24 @@ class SubjectVisualHelper {
       return const [Color(0xFFEA580C), Color(0xFFC2410C)]; // Orange/Amber
     }
 
-    // 4. العلوم: بنفسجي تقني ومختبري عصري
-    if (s.contains('علوم') ||
-        s.contains('كيمياء') ||
-        s.contains('فيزياء') ||
-        s.contains('أحياء') ||
-        s.contains('science')) {
+    // 4. الأحياء: أخضر طبيعي حيوي
+    if (s.contains('أحياء') || s.contains('احياء') || s.contains('bio')) {
+      return const [Color(0xFF16A34A), Color(0xFF15803D)]; // Forest Green
+    }
+
+    // 5. الفيزياء: كحلي نيلي كهربائي حديث
+    if (s.contains('فيزياء') || s.contains('physics')) {
+      return const [Color(0xFF4F46E5), Color(0xFF3730A3)]; // Indigo
+    }
+
+    // 6. الكيمياء: بنفسجي مخبري متألق
+    if (s.contains('كيمياء') || s.contains('chemistry')) {
       return const [Color(0xFF8B5CF6), Color(0xFF6D28D9)]; // Violet
+    }
+
+    // 7. العلوم العامة: أرجواني عصري
+    if (s.contains('علوم') || s.contains('science')) {
+      return const [Color(0xFF9333EA), Color(0xFF7E22CE)]; // Purple
     }
 
     // 5. الإنجليزية: وردي مرجاني نشيط

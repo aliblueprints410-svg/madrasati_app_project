@@ -5,6 +5,11 @@ class AppConstants {
   // Default School UUID (Primary School 1 - SCH-1)
   static const String defaultSchoolId = 'd581107e-2f01-4bd0-a89d-bf27f36a2574';
   
+  // Middle School (ANAWEEN-1 - متوسطة العناوين للبنين)
+  static const String anaweenSchoolId = 'e7b9f3a1-4c2d-4e8f-9a1b-3c5d7e9f1a2b';
+  static const String anaweenSchoolCode = 'ANAWEEN-1';
+  static const String anaweenSchoolName = 'متوسطة العناوين للبنين';
+  
   // Developer Info
   static const String developerName = 'علي';
   static const String developerTelegramUrl = 'https://t.me/Ali_Muhammed_410';

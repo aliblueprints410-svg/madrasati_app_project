@@ -42,9 +42,44 @@ class HomeworkService {
     return null;
   }
 
-  // Return official Iraqi primary curriculum subjects based on grade name
+  // Return official curriculum subjects based on grade name
   List<String> getSubjectsListForGrade(String gradeName) {
     final name = gradeName.toLowerCase();
+
+    // المرحلة المتوسطة
+    if (name.contains('متوسط')) {
+      if (name.contains('ثالث') || name.contains('3')) {
+        return [
+          'الاسلامية',
+          'العربية',
+          'الانكليزية',
+          'الاجتماعيات',
+          'الرياضيات',
+          'الاحياء',
+          'الفيزياء',
+          'الكيمياء',
+          'الفنية',
+          'الرياضة',
+        ];
+      } else {
+        // صف أول وثاني متوسط
+        return [
+          'الاسلامية',
+          'العربية',
+          'الانكليزية',
+          'الاجتماعيات',
+          'الرياضيات',
+          'الاحياء',
+          'الفيزياء',
+          'الكيمياء',
+          'الاخلاقية',
+          'الفنية',
+          'الرياضة',
+        ];
+      }
+    }
+
+    // المرحلة الابتدائية (يبقى كما هو بدون أي تغيير)
     if (name.contains('اول') ||
         name.contains('أول') ||
         name.contains('ثاني') ||
@@ -77,7 +112,7 @@ class HomeworkService {
     }
   }
 
-  // Get classes for a specific school (with automatic 6-grades provisioning for new schools)
+  // Get classes for a specific school (with automatic provisioning for new schools)
   Future<List<SchoolClass>> getClasses(String schoolId) async {
     final cleanSchoolId = AppConstants.sanitizeSchoolId(schoolId);
     try {
@@ -92,6 +127,45 @@ class HomeworkService {
         return list;
       }
     } catch (_) {}
+
+    // Special middle school provisioning if schoolId is ANAWEEN-1
+    if (cleanSchoolId == AppConstants.anaweenSchoolId ||
+        schoolId.toUpperCase().contains('ANAWEEN')) {
+      const middleGradeNames = [
+        'الصف الأول المتوسط',
+        'الصف الثاني المتوسط',
+        'الصف الثالث المتوسط',
+      ];
+      const anaweenClassIds = [
+        'c1111111-1111-4111-8111-111111111111',
+        'c2222222-2222-4222-8222-222222222222',
+        'c3333333-3333-4333-8333-333333333333',
+      ];
+      final List<SchoolClass> middleClasses = [];
+      final List<Map<String, dynamic>> toInsertMiddle = [];
+      for (int i = 0; i < middleGradeNames.length; i++) {
+        final order = i + 1;
+        final cId = anaweenClassIds[i];
+        middleClasses.add(
+          SchoolClass(
+            id: cId,
+            schoolId: AppConstants.anaweenSchoolId,
+            name: middleGradeNames[i],
+            order: order,
+          ),
+        );
+        toInsertMiddle.add({
+          'id': cId,
+          'school_id': AppConstants.anaweenSchoolId,
+          'name': middleGradeNames[i],
+          'order': order,
+        });
+      }
+      try {
+        await _supabase.from('classes').insert(toInsertMiddle);
+      } catch (_) {}
+      return middleClasses;
+    }
 
     // Auto-provision 6 isolated primary classes for this schoolId if not yet in DB
     const gradeNames = [
@@ -320,16 +394,24 @@ class HomeworkService {
 
   Future<List<Subject>> _generateFallbackSubjects(String classId) async {
     String gradeName = '';
-    try {
-      final classRes = await _supabase
-          .from('classes')
-          .select('name')
-          .eq('id', classId)
-          .maybeSingle();
-      if (classRes != null && classRes['name'] != null) {
-        gradeName = classRes['name'] as String;
-      }
-    } catch (_) {}
+    if (classId == 'c1111111-1111-4111-8111-111111111111') {
+      gradeName = 'الصف الأول المتوسط';
+    } else if (classId == 'c2222222-2222-4222-8222-222222222222') {
+      gradeName = 'الصف الثاني المتوسط';
+    } else if (classId == 'c3333333-3333-4333-8333-333333333333') {
+      gradeName = 'الصف الثالث المتوسط';
+    } else {
+      try {
+        final classRes = await _supabase
+            .from('classes')
+            .select('name')
+            .eq('id', classId)
+            .maybeSingle();
+        if (classRes != null && classRes['name'] != null) {
+          gradeName = classRes['name'] as String;
+        }
+      } catch (_) {}
+    }
 
     final subjectNames = getSubjectsListForGrade(gradeName);
     return subjectNames.map((name) {

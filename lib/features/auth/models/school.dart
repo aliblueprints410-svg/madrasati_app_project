@@ -3,7 +3,7 @@ class School {
   final String name;
   final String schoolCode;
 
-  School({
+  const School({
     required this.id,
     required this.name,
     required this.schoolCode,
