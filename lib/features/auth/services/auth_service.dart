@@ -93,7 +93,29 @@ class AuthService {
       throw Exception('كود المدرسة غير صحيح! يرجى التأكد من كود المدرسة.');
     }
 
-    // 2. Authenticate teacher credentials
+    // 2. Check pre-assigned school in school_teachers table (Admin Assignment)
+    try {
+      final assignedRow = await _supabase
+          .from('school_teachers')
+          .select('school_code')
+          .ilike('email', cleanEmail)
+          .maybeSingle();
+
+      if (assignedRow != null && assignedRow['school_code'] != null) {
+        final assignedCode = assignedRow['school_code'].toString().trim().toUpperCase();
+        if (assignedCode.isNotEmpty && assignedCode != school.schoolCode.toUpperCase()) {
+          throw Exception(
+            'عذراً، هذا الحساب مخصص لمدرسة ذات الكود ($assignedCode) ولا يمكنه الدخول إلى (${school.name})!',
+          );
+        }
+      }
+    } catch (e) {
+      if (e.toString().contains('عذراً، هذا الحساب مخصص')) {
+        rethrow;
+      }
+    }
+
+    // 3. Authenticate teacher credentials
     AuthResponse authRes;
     try {
       authRes = await _supabase.auth.signInWithPassword(
