@@ -128,35 +128,53 @@ class HomeworkService {
       }
     } catch (_) {}
 
-    // Special middle school provisioning if schoolId is ANAWEEN-1
+    // Check if this school is a Middle School (via code, stage column, or name)
+    bool isMiddle = false;
     if (cleanSchoolId == AppConstants.anaweenSchoolId ||
         schoolId.toUpperCase().contains('ANAWEEN')) {
+      isMiddle = true;
+    } else {
+      try {
+        final sRes = await _supabase
+            .from('schools')
+            .select('name, stage')
+            .eq('id', cleanSchoolId)
+            .maybeSingle();
+        if (sRes != null) {
+          final sName = sRes['name']?.toString() ?? '';
+          final sStage = sRes['stage']?.toString().toLowerCase() ?? '';
+          if (sStage == 'middle' || sName.contains('متوسط')) {
+            isMiddle = true;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (isMiddle) {
       const middleGradeNames = [
         'الصف الأول المتوسط',
         'الصف الثاني المتوسط',
         'الصف الثالث المتوسط',
       ];
-      const anaweenClassIds = [
-        'c1111111-1111-4111-8111-111111111111',
-        'c2222222-2222-4222-8222-222222222222',
-        'c3333333-3333-4333-8333-333333333333',
-      ];
       final List<SchoolClass> middleClasses = [];
       final List<Map<String, dynamic>> toInsertMiddle = [];
+      const uuid = Uuid();
       for (int i = 0; i < middleGradeNames.length; i++) {
         final order = i + 1;
-        final cId = anaweenClassIds[i];
+        final cId = (cleanSchoolId == AppConstants.anaweenSchoolId)
+            ? ['c1111111-1111-4111-8111-111111111111', 'c2222222-2222-4222-8222-222222222222', 'c3333333-3333-4333-8333-333333333333'][i]
+            : uuid.v5(Namespace.url.value, 'madrasati_class_${cleanSchoolId}_$order');
         middleClasses.add(
           SchoolClass(
             id: cId,
-            schoolId: AppConstants.anaweenSchoolId,
+            schoolId: cleanSchoolId,
             name: middleGradeNames[i],
             order: order,
           ),
         );
         toInsertMiddle.add({
           'id': cId,
-          'school_id': AppConstants.anaweenSchoolId,
+          'school_id': cleanSchoolId,
           'name': middleGradeNames[i],
           'order': order,
         });
@@ -251,12 +269,12 @@ class HomeworkService {
         }
         await prefs.setInt('$_localSubjectsRevKeyPrefix$classId', cloudBest.rev);
       } catch (_) {}
-      return cloudBest.subjects;
+      return await _sanitizeAndFilterSubjectsForClass(classId, cloudBest.subjects);
     }
 
     // 2. Return local override if present (and >= cloudBest.rev)
     if (localParsed != null) {
-      return localParsed.subjects;
+      return await _sanitizeAndFilterSubjectsForClass(classId, localParsed.subjects);
     }
 
     // 3. Query subjects table in Supabase
@@ -268,7 +286,7 @@ class HomeworkService {
 
       final list = (response as List).map((e) => Subject.fromJson(e)).toList();
       if (list.isNotEmpty) {
-        return list;
+        return await _sanitizeAndFilterSubjectsForClass(classId, list);
       }
 
       // If empty in database, get class name to return official grade subjects
@@ -276,6 +294,68 @@ class HomeworkService {
     } catch (_) {
       return await _generateFallbackSubjects(classId);
     }
+  }
+
+  // Ensure strict stage isolation & eliminate duplicate subjects
+  Future<List<Subject>> _sanitizeAndFilterSubjectsForClass(
+    String classId,
+    List<Subject> rawList,
+  ) async {
+    String className = '';
+    if (classId == 'c1111111-1111-4111-8111-111111111111') {
+      className = 'الصف الأول المتوسط';
+    } else if (classId == 'c2222222-2222-4222-8222-222222222222') {
+      className = 'الصف الثاني المتوسط';
+    } else if (classId == 'c3333333-3333-4333-8333-333333333333') {
+      className = 'الصف الثالث المتوسط';
+    } else {
+      try {
+        final cRes = await _supabase
+            .from('classes')
+            .select('name')
+            .eq('id', classId)
+            .maybeSingle();
+        if (cRes != null && cRes['name'] != null) {
+          className = cRes['name'] as String;
+        }
+      } catch (_) {}
+    }
+
+    final isMiddleClass = className.contains('متوسط');
+    final isPrimaryClass = className.contains('ابتدائي');
+
+    // Strict stage filtering
+    final filtered = rawList.where((s) {
+      final name = s.name.trim();
+      if (isMiddleClass) {
+        // Middle school should never contain primary-only subjects
+        if (name == 'القراءة' || name == 'العلوم') return false;
+      } else if (isPrimaryClass) {
+        // Primary school should never contain middle-only subjects
+        if (name == 'الأحياء' ||
+            name == 'الاحياء' ||
+            name == 'الفيزياء' ||
+            name == 'الكيمياء') {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
+
+    // Deduplicate by trimmed name
+    final seen = <String>{};
+    final List<Subject> deduplicated = [];
+    for (final s in filtered) {
+      final key = s.name.trim().toLowerCase();
+      if (!seen.contains(key)) {
+        seen.add(key);
+        deduplicated.add(s);
+      }
+    }
+
+    return deduplicated.isNotEmpty
+        ? deduplicated
+        : await _generateFallbackSubjects(classId);
   }
 
   Future<void> _saveSubjectsOverride(String classId, List<Subject> subjects) async {

@@ -51,6 +51,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         await localStorage.saveSchoolName(school.name);
         await localStorage.saveSchoolShortCode(school.schoolCode);
         await localStorage.saveStudentName('طالبنا العزيز');
+        await localStorage.saveSelectedGrade('');
+        await localStorage.saveSelectedGradeName('');
         ref.read(notificationServiceProvider).subscribeToSchool(school.id);
         ref.invalidate(activeSchoolProvider);
 
