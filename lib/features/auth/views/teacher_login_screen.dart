@@ -1,10 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/qr_code_scanner_sheet.dart';
 import '../providers/auth_providers.dart';
 import '../../teacher/views/teacher_dashboard_screen.dart';
 
@@ -17,6 +17,7 @@ class TeacherLoginScreen extends ConsumerStatefulWidget {
 
 class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _schoolCodeController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final LocalAuthentication _localAuth = LocalAuthentication();
@@ -30,12 +31,26 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen> {
     _checkBiometricSupport();
   }
 
+  Future<void> _scanSchoolQrCode() async {
+    final scanned = await QrCodeScannerSheet.scan(context);
+    if (scanned != null && scanned.trim().isNotEmpty && mounted) {
+      setState(() {
+        _schoolCodeController.text = scanned.trim();
+      });
+    }
+  }
+
   Future<void> _checkBiometricSupport() async {
     try {
       bool canCheck = await _localAuth.canCheckBiometrics || await _localAuth.isDeviceSupported();
       final prefs = await SharedPreferences.getInstance();
       final savedEmail = prefs.getString('teacher_email');
       final savedPassword = prefs.getString('teacher_password');
+      final savedSchoolCode = prefs.getString('teacher_school_code');
+
+      if (savedSchoolCode != null && savedSchoolCode.isNotEmpty) {
+        _schoolCodeController.text = savedSchoolCode;
+      }
 
       if (mounted) {
         setState(() {
@@ -55,8 +70,10 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen> {
         final prefs = await SharedPreferences.getInstance();
         final savedEmail = prefs.getString('teacher_email');
         final savedPassword = prefs.getString('teacher_password');
+        final savedSchoolCode = prefs.getString('teacher_school_code') ?? 'SCH-1';
 
         if (savedEmail != null && savedPassword != null) {
+          _schoolCodeController.text = savedSchoolCode;
           _emailController.text = savedEmail;
           _passwordController.text = savedPassword;
           await _login();
@@ -76,6 +93,7 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen> {
 
   @override
   void dispose() {
+    _schoolCodeController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -88,30 +106,35 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen> {
 
     try {
       final authService = ref.read(authServiceProvider);
-      await authService.loginTeacher(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
+      final school = await authService.loginTeacherWithSchool(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        schoolCode: _schoolCodeController.text.trim(),
       );
 
-      // Save credentials for biometric login
+      // Save credentials & bound school info
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('teacher_email', _emailController.text.trim());
       await prefs.setString('teacher_password', _passwordController.text.trim());
+      await prefs.setString('teacher_school_code', school.schoolCode);
+      await prefs.setString('teacher_school_name', school.name);
 
-      // Save active school id if not set
+      // Save active school UUID and clear any student grade selection so teacher mode is completely separate
       final localStorage = ref.read(localStorageServiceProvider);
-      if (localStorage.getSchoolCode() == null) {
-        await localStorage.saveSchoolCode(AppConstants.defaultSchoolId);
-      }
+      await localStorage.clearStudentGrade();
+      await localStorage.saveSchoolCode(school.id);
+      await localStorage.saveSchoolName(school.name);
+      await localStorage.saveSchoolShortCode(school.schoolCode);
+      ref.invalidate(activeSchoolProvider);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
-              Icon(Icons.check_circle_rounded, color: Colors.white),
-              SizedBox(width: 8),
-              Text('أهلاً بك! تم تسجيل الدخول بنجاح'),
+              const Icon(Icons.check_circle_rounded, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(child: Text('أهلاً بك في إدارة: ${school.name}')),
             ],
           ),
           backgroundColor: AppColors.success,
@@ -119,15 +142,19 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TeacherDashboardScreen()));
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const TeacherDashboardScreen()),
+        (route) => false,
+      );
     } catch (e) {
       if (!mounted) return;
+      final cleanError = e.toString().replaceFirst('Exception: ', '');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('خطأ في تسجيل الدخول: $e'),
+          content: Text(cleanError),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     } finally {
@@ -193,7 +220,7 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'أهلاً بك مجدداً! أدخل بيانات حسابك لإدارة الواجبات والصفوف',
+                    'أدخل كود مدرستك وبيانات حسابك لإدارة الصفوف والواجبات الخاصة بمدرستك',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
@@ -201,7 +228,50 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen> {
                       height: 1.4,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
+
+                  // School Code
+                  Text(
+                    'كود المدرسة الخاص',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white70 : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _schoolCodeController,
+                    decoration: InputDecoration(
+                      hintText: 'مثال: SCH-1 أو SCH-2',
+                      prefixIcon: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Material(
+                          color: AppColors.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: _scanSchoolQrCode,
+                            child: const Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Icon(
+                                Icons.qr_code_scanner_rounded,
+                                color: AppColors.primary,
+                                size: 22,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) {
+                        return 'يرجى إدخال كود المدرسة الخاص بك';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 18),
 
                   // Email
                   Text(
@@ -228,7 +298,7 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
 
                   // Password
                   Text(

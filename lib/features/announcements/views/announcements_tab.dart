@@ -58,10 +58,10 @@ class _AnnouncementsTabState extends ConsumerState<AnnouncementsTab> {
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.08),
+                          color: AppColors.primary.withValues(alpha: 0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(Icons.campaign_outlined, size: 64, color: AppColors.primary.withOpacity(0.6)),
+                        child: Icon(Icons.campaign_outlined, size: 64, color: AppColors.primary.withValues(alpha: 0.6)),
                       ),
                       const SizedBox(height: 16),
                       const Text(
@@ -109,8 +109,8 @@ class _AnnouncementsTabState extends ConsumerState<AnnouncementsTab> {
                             boxShadow: [
                               BoxShadow(
                                 color: isPriority
-                                    ? Colors.red.withOpacity(0.12)
-                                    : Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                                    ? Colors.red.withValues(alpha: 0.12)
+                                    : Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
                                 blurRadius: 14,
                                 offset: const Offset(0, 5),
                               ),
@@ -168,7 +168,7 @@ class _AnnouncementsTabState extends ConsumerState<AnnouncementsTab> {
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                             decoration: BoxDecoration(
-                                              color: AppColors.primary.withOpacity(0.1),
+                                              color: AppColors.primary.withValues(alpha: 0.1),
                                               borderRadius: BorderRadius.circular(10),
                                             ),
                                             child: const Row(

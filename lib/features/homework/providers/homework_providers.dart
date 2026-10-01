@@ -22,13 +22,38 @@ final subjectsProvider = FutureProvider.family<List<Subject>, String>((ref, clas
   return service.getSubjects(classId);
 });
 
-// Stream Providers for Homework
-final currentHomeworkProvider = StreamProvider.family<List<Homework>, String>((ref, subjectId) {
+// Future Providers for Homework (prevents Realtime stream reconnect loops & image flickering)
+final currentHomeworkProvider = FutureProvider.family<List<Homework>, String>((ref, subjectId) async {
   final service = ref.watch(homeworkServiceProvider);
-  return service.watchCurrentHomework(subjectId);
+  return service.getCurrentHomework(subjectId);
 });
 
-final homeworkArchiveProvider = StreamProvider.family<List<Homework>, String>((ref, subjectId) {
+final homeworkArchiveProvider = FutureProvider.family<List<Homework>, String>((ref, subjectId) async {
   final service = ref.watch(homeworkServiceProvider);
-  return service.watchHomeworkArchive(subjectId);
+  return service.getHomeworkArchive(subjectId);
 });
+
+final studentCompletedHomeworkIdsProvider = FutureProvider<Set<String>>((ref) async {
+  final service = ref.watch(homeworkServiceProvider);
+  return service.getStudentCompletedHomeworkIds();
+});
+
+/// Checks whether a subject has new unread/unopened homework
+final subjectHasUnreadHomeworkProvider = FutureProvider.family<bool, String>((ref, subjectId) async {
+  try {
+    final currentHw = await ref.watch(currentHomeworkProvider(subjectId).future);
+    if (currentHw.isEmpty) return false;
+
+    final prefs = ref.watch(sharedPreferencesProvider);
+    final lastViewed = prefs.getInt('subject_last_viewed_$subjectId') ?? 0;
+
+    for (final hw in currentHw) {
+      if (hw.createdAt.millisecondsSinceEpoch > lastViewed) {
+        return true;
+      }
+    }
+  } catch (_) {}
+  return false;
+});
+
+

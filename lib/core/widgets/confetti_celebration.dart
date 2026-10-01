@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 class ConfettiCelebrationOverlay extends StatefulWidget {
   final Widget child;
-  const ConfettiCelebrationOverlay({Key? key, required this.child}) : super(key: key);
+  const ConfettiCelebrationOverlay({super.key, required this.child});
 
   static void trigger(BuildContext context) {
     final state = context.findAncestorStateOfType<_ConfettiCelebrationOverlayState>();
@@ -130,7 +130,7 @@ class _ConfettiPainter extends CustomPainter {
       final opacity = (1.0 - progress).clamp(0.0, 1.0);
 
       final paint = Paint()
-        ..color = p.color.withOpacity(opacity)
+        ..color = p.color.withValues(alpha: opacity)
         ..style = PaintingStyle.fill;
 
       canvas.save();

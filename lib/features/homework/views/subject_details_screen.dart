@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import '../../../core/providers/core_providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/arabic_day_helper.dart';
+import '../../../core/utils/subject_visual_helper.dart';
 import '../../../core/widgets/confetti_celebration.dart';
 import '../../../core/widgets/shimmer_loading.dart';
 import '../models/subject.dart';
@@ -25,17 +28,39 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
   void initState() {
     super.initState();
     timeago.setLocaleMessages('ar', timeago.ArMessages());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _markSubjectAsViewed();
+    });
   }
 
-  void _markAsCompleted(Homework hw) {
-    // Trigger the global confetti particle explosion!
+  Future<void> _markSubjectAsViewed() async {
+    try {
+      final prefs = ref.read(sharedPreferencesProvider);
+      await prefs.setInt('subject_last_viewed_${widget.subject.id}', DateTime.now().millisecondsSinceEpoch);
+      ref.invalidate(subjectHasUnreadHomeworkProvider(widget.subject.id));
+    } catch (_) {}
+  }
+
+  Future<void> _markAsCompleted(Homework hw) async {
+    // 1. Move homework to archive (student local completion)
+    await ref.read(homeworkServiceProvider).archiveHomework(
+      hw.id,
+      subjectId: widget.subject.id,
+    );
+    ref.invalidate(currentHomeworkProvider(widget.subject.id));
+    ref.invalidate(homeworkArchiveProvider(widget.subject.id));
+    ref.invalidate(studentCompletedHomeworkIdsProvider);
+
+    if (!mounted) return;
+
+    // 2. Trigger the global confetti particle explosion!
     ConfettiCelebrationOverlay.trigger(context);
 
-    // Show celebration bottom sheet
+    // 3. Show celebration bottom sheet
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) {
+      builder: (sheetContext) {
         return Container(
           margin: const EdgeInsets.all(16),
           padding: const EdgeInsets.all(24),
@@ -44,7 +69,7 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
             borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.15),
+                color: Colors.black.withValues(alpha: 0.15),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -56,7 +81,7 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
               Container(
                 width: 70,
                 height: 70,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: AppColors.successGradient,
                   shape: BoxShape.circle,
                 ),
@@ -72,20 +97,42 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'أحسنت إنجاز واجب "${hw.title}" في الوقت المحدد. استمر في تفوقك!',
+                'تم إنجاز واجب "${hw.title}" بنجاح ونقله إلى خانة مكتمل.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(height: 1.5, color: Colors.grey),
               ),
               const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        if (mounted) {
+                          setState(() => _selectedSection = 1);
+                        }
+                      },
+                      icon: const Icon(Icons.task_alt_rounded, size: 18),
+                      label: const Text('عرض المكتمل'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
                   ),
-                  child: const Text('متابعة الدراسة 📚'),
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('متابعة الدراسة 📚'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -98,6 +145,7 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
   Widget build(BuildContext context) {
     final currentHomeworkAsync = ref.watch(currentHomeworkProvider(widget.subject.id));
     final archiveHomeworkAsync = ref.watch(homeworkArchiveProvider(widget.subject.id));
+    final completedIds = ref.watch(studentCompletedHomeworkIdsProvider).valueOrNull ?? <String>{};
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -115,6 +163,7 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
             onRefresh: () async {
               ref.invalidate(currentHomeworkProvider(widget.subject.id));
               ref.invalidate(homeworkArchiveProvider(widget.subject.id));
+              ref.invalidate(studentCompletedHomeworkIdsProvider);
             },
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
@@ -124,11 +173,15 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
+                gradient: LinearGradient(
+                  colors: SubjectVisualHelper.getSubjectGradient(widget.subject.name),
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(22),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.3),
+                    color: SubjectVisualHelper.getSubjectGradient(widget.subject.name)[0].withValues(alpha: 0.35),
                     blurRadius: 16,
                     offset: const Offset(0, 8),
                   ),
@@ -139,10 +192,15 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.22),
                       borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.2),
                     ),
-                    child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 32),
+                    child: Icon(
+                      SubjectVisualHelper.getSubjectIcon(widget.subject.name),
+                      color: Colors.white,
+                      size: 32,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -194,7 +252,7 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
                           boxShadow: _selectedSection == 0
                               ? [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.08),
+                                    color: Colors.black.withValues(alpha: 0.08),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   )
@@ -242,7 +300,7 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
                           boxShadow: _selectedSection == 1
                               ? [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.08),
+                                    color: Colors.black.withValues(alpha: 0.08),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   )
@@ -253,7 +311,7 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              Icons.history_rounded,
+                              Icons.task_alt_rounded,
                               size: 18,
                               color: _selectedSection == 1
                                   ? (_selectedSection == 1 && isDark ? Colors.white : AppColors.primary)
@@ -261,7 +319,7 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'أرشيف التحاضير',
+                              'مكتمل',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
@@ -300,7 +358,7 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF22C55E).withOpacity(0.12),
+                              color: const Color(0xFF22C55E).withValues(alpha: 0.12),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -366,10 +424,10 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
                       ),
                       child: const Column(
                         children: [
-                          Icon(Icons.inventory_2_outlined, size: 50, color: Colors.grey),
+                          Icon(Icons.task_alt_rounded, size: 50, color: Colors.grey),
                           SizedBox(height: 12),
                           Text(
-                            'لا توجد تحاضير سابقة مؤرشفة لهذه المادة',
+                            'لا توجد تحاضير مكتملة لهذه المادة بعد',
                             style: TextStyle(color: Colors.grey, fontSize: 14),
                             textAlign: TextAlign.center,
                           ),
@@ -383,6 +441,11 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
                     itemCount: homeworks.length,
                     itemBuilder: (context, index) {
                       final hw = homeworks[index];
+                      final isCompletedByStudent = completedIds.contains(hw.id);
+                      final statusColor = isCompletedByStudent ? AppColors.success : Colors.redAccent;
+                      final statusText = isCompletedByStudent ? 'تم إنجاز الواجب ✅' : 'انتهى وقت الواجب ⏰';
+                      final statusIcon = isCompletedByStudent ? Icons.check_circle_rounded : Icons.timer_off_rounded;
+
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
@@ -403,10 +466,10 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
                                   Container(
                                     padding: const EdgeInsets.all(6),
                                     decoration: BoxDecoration(
-                                      color: Colors.grey.withOpacity(0.12),
+                                      color: statusColor.withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Icon(Icons.history_rounded, size: 16, color: Colors.grey),
+                                    child: Icon(statusIcon, size: 16, color: statusColor),
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
@@ -415,15 +478,39 @@ class _SubjectDetailsScreenState extends ConsumerState<SubjectDetailsScreen> {
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                                     ),
                                   ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      statusText,
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  const Icon(Icons.calendar_today_rounded, size: 12, color: AppColors.primary),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    timeago.format(hw.createdAt, locale: 'ar'),
-                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                    hw.deadline != null
+                                        ? ArabicDayHelper.formatFullDayDateTime(hw.deadline!)
+                                        : ArabicDayHelper.formatDayAndDate(hw.createdAt),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
+                                    ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                hw.description,
+                                ArabicDayHelper.formatDescriptionDatesToDayNames(hw.description),
                                 style: TextStyle(
                                   fontSize: 13,
                                   height: 1.5,

@@ -10,3 +10,30 @@ final authServiceProvider = Provider<AuthService>((ref) {
 
 // Provider to hold the current school code logic state
 final authStateProvider = StateProvider<bool>((ref) => false);
+
+// Resolves the currently logged-in school (both for Student and Teacher)
+final activeSchoolProvider = FutureProvider.autoDispose<School?>((ref) async {
+  final localStorage = ref.watch(localStorageServiceProvider);
+  final schoolId = localStorage.getSchoolCode();
+  if (schoolId == null || schoolId.isEmpty) return null;
+
+  final authService = ref.watch(authServiceProvider);
+  final fetched = await authService.getSchoolById(schoolId);
+  if (fetched != null) {
+    await localStorage.saveSchoolName(fetched.name);
+    await localStorage.saveSchoolShortCode(fetched.schoolCode);
+    return fetched;
+  }
+
+  final cachedName = localStorage.getSchoolName();
+  final cachedShortCode = localStorage.getSchoolShortCode();
+  if (cachedName != null && cachedName.isNotEmpty) {
+    return School(
+      id: schoolId,
+      name: cachedName,
+      schoolCode: cachedShortCode ?? '',
+    );
+  }
+  return null;
+});
+

@@ -78,7 +78,7 @@ class _IntroWalkthroughScreenState extends State<IntroWalkthroughScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.08),
+                      color: AppColors.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -127,8 +127,8 @@ class _IntroWalkthroughScreenState extends State<IntroWalkthroughScreen> {
                                 shape: BoxShape.circle,
                                 gradient: RadialGradient(
                                   colors: [
-                                    gradient[0].withOpacity(0.25),
-                                    gradient[0].withOpacity(0.0),
+                                    gradient[0].withValues(alpha: 0.25),
+                                    gradient[0].withValues(alpha: 0.0),
                                   ],
                                 ),
                               ),
@@ -145,7 +145,7 @@ class _IntroWalkthroughScreenState extends State<IntroWalkthroughScreen> {
                                 borderRadius: BorderRadius.circular(36),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: gradient[0].withOpacity(0.4),
+                                    color: gradient[0].withValues(alpha: 0.4),
                                     blurRadius: 28,
                                     offset: const Offset(0, 14),
                                   ),

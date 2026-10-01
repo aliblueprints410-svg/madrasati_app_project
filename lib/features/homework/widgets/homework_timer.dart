@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 class HomeworkTimer extends StatefulWidget {
   final DateTime deadline;
-  const HomeworkTimer({Key? key, required this.deadline}) : super(key: key);
+  const HomeworkTimer({super.key, required this.deadline});
 
   @override
   State<HomeworkTimer> createState() => _HomeworkTimerState();

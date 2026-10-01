@@ -6,6 +6,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../auth/providers/auth_providers.dart';
 import '../../auth/views/onboarding_screen.dart';
 import '../../homework/views/grade_selection_screen.dart';
 
@@ -32,26 +33,52 @@ class SettingsTab extends ConsumerWidget {
   }
 
   Future<void> _launchWhatsApp(BuildContext context) async {
-    Clipboard.setData(const ClipboardData(text: AppConstants.developerWhatsapp));
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.check_circle_rounded, color: Colors.greenAccent),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'تم نسخ معرف الواتساب: ${AppConstants.developerWhatsapp}',
-                style: TextStyle(fontWeight: FontWeight.bold),
+    final Uri url = Uri.parse(AppConstants.developerWhatsappUrl);
+    try {
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw Exception('Could not launch WhatsApp');
+      }
+    } catch (_) {
+      if (!context.mounted) return;
+      Clipboard.setData(const ClipboardData(text: AppConstants.developerWhatsapp));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.greenAccent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'تم نسخ رقم الواتساب: ${AppConstants.developerWhatsapp}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+      );
+    }
+  }
+
+  Future<void> _launchFacebook(BuildContext context) async {
+    final Uri url = Uri.parse(AppConstants.developerFacebookUrl);
+    try {
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw Exception('Could not launch Facebook');
+      }
+    } catch (_) {
+      if (!context.mounted) return;
+      Clipboard.setData(const ClipboardData(text: AppConstants.developerFacebookUrl));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('تم نسخ رابط صفحة الفيسبوك'),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
   }
 
   void _showLogoutDialog(BuildContext context, WidgetRef ref) {
@@ -101,11 +128,17 @@ class SettingsTab extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final isDark = themeMode == ThemeMode.dark ||
         (themeMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-    final localStorage = ref.read(localStorageServiceProvider);
+    final localStorage = ref.watch(localStorageServiceProvider);
+    final activeSchool = ref.watch(activeSchoolProvider).valueOrNull;
+    final schoolName = activeSchool?.name ?? localStorage.getSchoolName() ?? 'المدرسة المسجلة';
+    final shortCode = activeSchool?.schoolCode ?? localStorage.getSchoolShortCode() ?? '';
+    final gradeName = localStorage.getSelectedGradeName() ?? '';
     final schoolCode = localStorage.getSchoolCode() ?? 'غير محدد';
-    final displayCode = (schoolCode == AppConstants.defaultSchoolId || schoolCode == 'd581107e-2f01-4bd0-a89d-bf27f36a2574')
-        ? 'SCH-1'
-        : (schoolCode.length > 16 ? '${schoolCode.substring(0, 10)}...' : schoolCode);
+    final displayCode = shortCode.isNotEmpty
+        ? shortCode
+        : ((schoolCode == AppConstants.defaultSchoolId || schoolCode == 'd581107e-2f01-4bd0-a89d-bf27f36a2574')
+            ? 'SCH-1'
+            : (schoolCode.length > 16 ? '${schoolCode.substring(0, 10)}...' : schoolCode));
 
     return Scaffold(
       appBar: AppBar(
@@ -151,17 +184,29 @@ class SettingsTab extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'المدرسة المسجلة',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.white70,
+                          Text(
+                            schoolName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          if (gradeName.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              gradeName,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 8),
                           InkWell(
                             onTap: () {
-                              Clipboard.setData(ClipboardData(text: schoolCode));
+                              Clipboard.setData(ClipboardData(text: displayCode));
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: const Text('تم نسخ كود المدرسة إلى الحافظة'),
@@ -226,6 +271,92 @@ class SettingsTab extends ConsumerWidget {
                   onChanged: (value) {
                     ref.read(themeModeProvider.notifier).state = value ? ThemeMode.dark : ThemeMode.light;
                   },
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Section: Notifications
+              _buildSectionHeader('التنبيهات والإشعارات'),
+              const SizedBox(height: 10),
+              Container(
+                decoration: _cardBoxDecoration(context, isDark),
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.notifications_active_rounded, color: Colors.amber),
+                      ),
+                      title: const Text('إشعارات الواجبات اليومية', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      subtitle: const Text('تلقي تنبيه فوري عند نشر المعلم واجباً أو تحضيراً جديداً', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      trailing: ElevatedButton(
+                        onPressed: () async {
+                          final granted = await ref.read(notificationServiceProvider).requestPermission();
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(granted ? 'إذن الإشعارات مفعل بنجاح' : 'يرجى التأكد من السماح بالإشعارات في إعدادات الهاتف'),
+                              backgroundColor: granted ? AppColors.success : AppColors.warning,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('تفعيل / فحص'),
+                      ),
+                    ),
+                    const Divider(height: 1, indent: 16, endIndent: 16),
+                    ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.cyan.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.send_rounded, color: Colors.cyan),
+                      ),
+                      title: const Text('إرسال إشعار فحص وتجربة', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      subtitle: const Text('أرسل إشعاراً للتأكد من وصول التنبيهات إلى هذا الجهاز', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      trailing: const Icon(Icons.touch_app_rounded, size: 20, color: Colors.cyan),
+                      onTap: () async {
+                        final currentSchoolId = AppConstants.sanitizeSchoolId(localStorage.getSchoolCode());
+                        final gradeId = localStorage.getSelectedGrade();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('جاري إرسال إشعار تجريبي عبر OneSignal...'),
+                            duration: Duration(seconds: 1),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        final success = await ref.read(notificationServiceProvider).sendTestNotification(
+                          schoolCode: currentSchoolId,
+                          classId: gradeId,
+                        );
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              success
+                                  ? 'تم إرسال الإشعار بنجاح! راجع شريط التنبيهات في هاتفك.'
+                                  : 'تعذر تسليم الإشعار للهاتف (تحتاج منصة OneSignal لربط مفتاح Firebase FCM).',
+                            ),
+                            backgroundColor: success ? AppColors.success : AppColors.error,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),
@@ -377,26 +508,32 @@ class SettingsTab extends ConsumerWidget {
                         child: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 20),
                       ),
                       title: const Text('واتساب (WhatsApp)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      subtitle: const Text(
+                      subtitle: Text(
                         AppConstants.developerWhatsapp,
-                        style: TextStyle(fontSize: 12, color: Color(0xFF25D366), fontWeight: FontWeight.w500),
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF25D366), fontWeight: FontWeight.bold),
                       ),
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF25D366).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.copy_rounded, size: 12, color: Color(0xFF25D366)),
-                            SizedBox(width: 4),
-                            Text('نسخ', style: TextStyle(fontSize: 11, color: Color(0xFF25D366), fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
+                      trailing: const Icon(Icons.open_in_new_rounded, size: 16, color: Colors.grey),
                       onTap: () => _launchWhatsApp(context),
+                    ),
+                    Divider(height: 1, color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+
+                    // Facebook Contact
+                    ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1877F2).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.public_rounded, color: Color(0xFF1877F2), size: 20),
+                      ),
+                      title: const Text('فيسبوك (Facebook)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      subtitle: const Text(
+                        'صفحة المطور الرسمية على فيسبوك',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF1877F2), fontWeight: FontWeight.w500),
+                      ),
+                      trailing: const Icon(Icons.open_in_new_rounded, size: 16, color: Colors.grey),
+                      onTap: () => _launchFacebook(context),
                     ),
                   ],
                 ),

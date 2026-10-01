@@ -1,10 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/responsive.dart';
+import '../../../../core/utils/subject_visual_helper.dart';
 import '../../../homework/models/subject.dart';
 import '../../../homework/providers/homework_providers.dart';
 
@@ -26,18 +26,34 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
       return;
     }
 
-    final nameController = TextEditingController(text: existingSubject?.name ?? '');
-    final supabase = ref.read(supabaseClientProvider);
+    final initialText = existingSubject?.name ?? '';
+    final nameController = TextEditingController(text: initialText)
+      ..selection = TextSelection.fromPosition(
+        TextPosition(offset: initialText.length),
+      );
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: Text(existingSubject == null ? 'إضافة مادة جديدة' : 'تعديل اسم المادة', style: const TextStyle(fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(hintText: 'مثال: التربية الفنية، الحاسوب...'),
-        ),
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          title: Text(
+            existingSubject == null ? 'إضافة مادة جديدة' : 'تعديل اسم المادة',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: TextField(
+            controller: nameController,
+            autofocus: true,
+            textDirection: TextDirection.rtl,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontFamily: 'sans-serif',
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+            decoration: const InputDecoration(hintText: 'مثال: التربية الفنية، الحاسوب...'),
+          ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -48,20 +64,34 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
               if (nameController.text.trim().isEmpty) return;
 
               try {
+                final homeworkService = ref.read(homeworkServiceProvider);
                 if (existingSubject == null) {
-                  await supabase.from('subjects').insert({
-                    'id': const Uuid().v4(),
-                    'class_id': _selectedClassId!,
-                    'name': nameController.text.trim(),
-                  });
+                  await homeworkService.addSubject(
+                    _selectedClassId!,
+                    nameController.text.trim(),
+                  );
                 } else {
-                  await supabase.from('subjects').update({
-                    'name': nameController.text.trim(),
-                  }).eq('id', existingSubject.id);
+                  await homeworkService.updateSubject(
+                    _selectedClassId!,
+                    existingSubject.id,
+                    nameController.text.trim(),
+                    oldName: existingSubject.name,
+                  );
                 }
 
                 ref.invalidate(subjectsProvider(_selectedClassId!));
-                if (context.mounted) Navigator.pop(context);
+                await ref.read(subjectsProvider(_selectedClassId!).future);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(existingSubject == null
+                          ? 'تمت إضافة المادة بنجاح'
+                          : 'تم تعديل اسم المادة بنجاح'),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                }
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
@@ -71,6 +101,7 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
             child: const Text('حفظ'),
           ),
         ],
+        ),
       ),
     );
   }
@@ -108,6 +139,7 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
       final homeworkService = ref.read(homeworkServiceProvider);
       await homeworkService.seedDefaultSubjectsForClass(_selectedClassId!, _selectedClassName!);
       ref.invalidate(subjectsProvider(_selectedClassId!));
+      await ref.read(subjectsProvider(_selectedClassId!).future);
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -149,9 +181,18 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
     if (confirm != true) return;
 
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      await supabase.from('subjects').delete().eq('id', subjectId);
+      final homeworkService = ref.read(homeworkServiceProvider);
+      await homeworkService.deleteSubject(_selectedClassId!, subjectId);
       ref.invalidate(subjectsProvider(_selectedClassId!));
+      await ref.read(subjectsProvider(_selectedClassId!).future);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم حذف المادة بنجاح'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
@@ -258,7 +299,7 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
                                 itemCount: subjects.length,
                                 itemBuilder: (context, index) {
                                   final subject = subjects[index];
-                                  final gradient = AppColors.getSubjectGradient(index);
+                                  final gradient = SubjectVisualHelper.getSubjectGradient(subject.name, index);
 
                                   return Card(
                                     color: isDark ? AppColors.darkCard : Colors.white,
@@ -269,13 +310,25 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
                                     ),
                                     child: ListTile(
                                       leading: Container(
-                                        width: 40,
-                                        height: 40,
+                                        width: 42,
+                                        height: 42,
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(colors: gradient),
-                                          shape: BoxShape.circle,
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: gradient[0].withValues(alpha: 0.3),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
                                         ),
-                                        child: const Icon(Icons.book_rounded, color: Colors.white, size: 20),
+                                        child: Icon(
+                                          SubjectVisualHelper.getSubjectIcon(subject.name),
+                                          color: Colors.white,
+                                          size: 22,
+                                        ),
                                       ),
                                       title: Text(subject.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                                       trailing: Row(

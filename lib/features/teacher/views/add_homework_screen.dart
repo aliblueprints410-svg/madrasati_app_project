@@ -1,15 +1,16 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/arabic_day_helper.dart';
 import '../../homework/models/homework.dart';
 import '../../homework/providers/homework_providers.dart';
 
@@ -29,6 +30,7 @@ class _AddHomeworkScreenState extends ConsumerState<AddHomeworkScreen> {
   String? _selectedSubjectId;
   File? _imageFile;
   DateTime? _deadline;
+  bool _isEveningShift = false; // false = صباحي, true = مسائي
   bool _isLoading = false;
 
   @override
@@ -60,32 +62,42 @@ class _AddHomeworkScreenState extends ConsumerState<AddHomeworkScreen> {
     }
   }
 
+  void _setShift(bool isEvening) {
+    setState(() {
+      _isEveningShift = isEvening;
+      final base = _deadline ?? DateTime.now().add(const Duration(days: 1));
+      _deadline = DateTime(
+        base.year,
+        base.month,
+        base.day,
+        _isEveningShift ? 20 : 9,
+        0,
+      );
+    });
+  }
+
   Future<void> _selectDeadline() async {
+    final initialDate = _deadline ?? DateTime.now().add(const Duration(days: 1));
     final pickedDate = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
+      initialDate: initialDate.isBefore(DateTime.now()) ? DateTime.now() : initialDate,
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 60)),
+      helpText: 'اختر تاريخ ويوم الواجب',
+      confirmText: 'تأكيد التاريخ',
+      cancelText: 'إلغاء',
     );
 
-    if (pickedDate != null) {
-      if (!mounted) return;
-      final pickedTime = await showTimePicker(
-        context: context,
-        initialTime: const TimeOfDay(hour: 20, minute: 0),
-      );
-
-      if (pickedTime != null) {
-        setState(() {
-          _deadline = DateTime(
-            pickedDate.year,
-            pickedDate.month,
-            pickedDate.day,
-            pickedTime.hour,
-            pickedTime.minute,
-          );
-        });
-      }
+    if (pickedDate != null && mounted) {
+      setState(() {
+        _deadline = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          _isEveningShift ? 20 : 9,
+          0,
+        );
+      });
     }
   }
 
@@ -115,7 +127,7 @@ class _AddHomeworkScreenState extends ConsumerState<AddHomeworkScreen> {
       String? imageUrl;
 
       bool imageUploadFailed = false;
-      // Upload Image if exists to Supabase storage
+      // Upload Image if exists to Supabase storage (with automatic Base64 fallback)
       if (_imageFile != null) {
         final fileExt = _imageFile!.path.split('.').last;
         final fileName = '${const Uuid().v4()}.$fileExt';
@@ -125,8 +137,13 @@ class _AddHomeworkScreenState extends ConsumerState<AddHomeworkScreen> {
           await supabase.storage.from('school_assets').upload(filePath, _imageFile!);
           imageUrl = supabase.storage.from('school_assets').getPublicUrl(filePath);
         } catch (e) {
-          imageUploadFailed = true;
-          debugPrint('[AddHomework] Image upload error: $e');
+          debugPrint('[AddHomework] Storage fallback to inline base64: $e');
+          try {
+            final bytes = await _imageFile!.readAsBytes();
+            imageUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+          } catch (_) {
+            imageUploadFailed = true;
+          }
         }
       }
 
@@ -144,18 +161,27 @@ class _AddHomeworkScreenState extends ConsumerState<AddHomeworkScreen> {
 
       await ref.read(homeworkServiceProvider).addHomework(newHomework);
 
-      // Send Push Notification to students
+      // Send Push Notification to students of this class ONLY
       try {
         final localStorage = ref.read(localStorageServiceProvider);
         final schoolId = AppConstants.sanitizeSchoolId(localStorage.getSchoolCode());
-        await ref.read(notificationServiceProvider).sendPushNotification(
+        final pushSuccess = await ref.read(notificationServiceProvider).sendPushNotification(
           schoolCode: schoolId,
-          title: '📚 تحضير مدرسي جديد: ${_titleController.text.trim()}',
+          classId: _selectedClassId,
+          title: '📚 واجب مدرسي جديد: ${_titleController.text.trim()}',
           message: _descController.text.trim().isNotEmpty
               ? _descController.text.trim()
-              : 'تمت إضافة تحضير/واجب جديد، يرجى مراجعته والتأكد من إنجازه.',
+              : 'تمت إضافة تحضير/واجب جديد لصفكم الدراسي، يرجى مراجعته والتأكد من إنجازه.',
+          additionalData: {
+            'type': 'homework',
+            'class_id': _selectedClassId,
+            'subject_id': _selectedSubjectId,
+          },
         );
-      } catch (_) {}
+        debugPrint('[AddHomeworkScreen] Push notification dispatched. Success: $pushSuccess');
+      } catch (e) {
+        debugPrint('[AddHomeworkScreen] Error sending push notification: $e');
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -303,9 +329,9 @@ class _AddHomeworkScreenState extends ConsumerState<AddHomeworkScreen> {
                         ),
                         const SizedBox(height: 20),
 
-                        // Deadline Section
+                        // Deadline Section (Day + Date + Morning/Evening Shift)
                         const Text(
-                          'موعد انتهاء التسليم',
+                          'تاريخ ويوم الواجب والدوام (صباحي / مسائي)',
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 10),
@@ -315,17 +341,174 @@ class _AddHomeworkScreenState extends ConsumerState<AddHomeworkScreen> {
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
                           ),
-                          child: ListTile(
-                            leading: const Icon(Icons.calendar_today_rounded, color: AppColors.secondary),
-                            title: Text(
-                              _deadline != null
-                                  ? DateFormat('yyyy-MM-dd • hh:mm a').format(_deadline!)
-                                  : 'الموعد النهائي للحل',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: const Text('اضغط لتحديد التاريخ والوقت', style: TextStyle(fontSize: 11)),
-                            trailing: const Icon(Icons.access_time_rounded, color: Colors.amber),
-                            onTap: _selectDeadline,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ListTile(
+                                leading: const Icon(Icons.calendar_today_rounded, color: AppColors.secondary),
+                                title: Text(
+                                  _deadline != null
+                                      ? ArabicDayHelper.formatFullDayDateTime(_deadline!)
+                                      : 'اختر يوم وتاريخ الواجب (صباحي أو مسائي)',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                subtitle: const Text(
+                                  'اضغط لاختيار التاريخ واليوم من التقويم',
+                                  style: TextStyle(fontSize: 11),
+                                ),
+                                trailing: Icon(
+                                  _isEveningShift ? Icons.nights_stay_rounded : Icons.wb_sunny_rounded,
+                                  color: Colors.amber,
+                                ),
+                                onTap: _selectDeadline,
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: ArabicDayHelper.schoolDays.map((day) {
+                                      final isSelected = _deadline?.weekday == day.weekday;
+                                      return Padding(
+                                        padding: const EdgeInsets.only(left: 8.0),
+                                        child: ChoiceChip(
+                                          label: Text(
+                                            day.shortName,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: isSelected
+                                                  ? Colors.white
+                                                  : (isDark ? Colors.white70 : Colors.black87),
+                                            ),
+                                          ),
+                                          selected: isSelected,
+                                          selectedColor: AppColors.primary,
+                                          backgroundColor: isDark ? AppColors.darkSurface : Colors.grey.shade100,
+                                          onSelected: (_) {
+                                            setState(() {
+                                              _deadline = ArabicDayHelper.nextDateForWeekday(
+                                                day.weekday,
+                                                hour: _isEveningShift ? 20 : 9,
+                                                minute: 0,
+                                              );
+                                            });
+                                          },
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+                              // Shift Selector: صباحي vs مسائي
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(12),
+                                        onTap: () => _setShift(false),
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 200),
+                                          padding: const EdgeInsets.symmetric(vertical: 10),
+                                          decoration: BoxDecoration(
+                                            color: !_isEveningShift
+                                                ? AppColors.primary
+                                                : (isDark ? AppColors.darkSurface : Colors.grey.shade100),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: !_isEveningShift
+                                                  ? AppColors.primary
+                                                  : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.wb_sunny_rounded,
+                                                size: 18,
+                                                color: !_isEveningShift ? Colors.amber : Colors.grey,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'صباحي',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: !_isEveningShift
+                                                      ? Colors.white
+                                                      : (isDark ? Colors.white70 : Colors.black87),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(12),
+                                        onTap: () => _setShift(true),
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 200),
+                                          padding: const EdgeInsets.symmetric(vertical: 10),
+                                          decoration: BoxDecoration(
+                                            color: _isEveningShift
+                                                ? AppColors.primary
+                                                : (isDark ? AppColors.darkSurface : Colors.grey.shade100),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: _isEveningShift
+                                                  ? AppColors.primary
+                                                  : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.nights_stay_rounded,
+                                                size: 18,
+                                                color: _isEveningShift ? Colors.amber : Colors.grey,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'مسائي',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: _isEveningShift
+                                                      ? Colors.white
+                                                      : (isDark ? Colors.white70 : Colors.black87),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                                child: OutlinedButton.icon(
+                                  onPressed: _selectDeadline,
+                                  icon: const Icon(Icons.date_range_rounded, size: 18),
+                                  label: const Text(
+                                    'تحديد التاريخ واليوم من التقويم',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 24),

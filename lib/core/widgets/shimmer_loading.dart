@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class ShimmerLoading extends StatefulWidget {
   final Widget child;
-  const ShimmerLoading({Key? key, required this.child}) : super(key: key);
+  const ShimmerLoading({super.key, required this.child});
 
   @override
   State<ShimmerLoading> createState() => _ShimmerLoadingState();

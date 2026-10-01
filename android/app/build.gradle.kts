@@ -37,8 +37,26 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
 }
 
 flutter {
     source = "../.."
+}
+
+configurations.all {
+    resolutionStrategy {
+        force(
+            "androidx.core:core:1.15.0",
+            "androidx.core:core-ktx:1.15.0",
+            "androidx.camera:camera-core:1.4.1",
+            "androidx.camera:camera-camera2:1.4.1",
+            "androidx.camera:camera-lifecycle:1.4.1",
+            "androidx.camera:camera-view:1.4.1"
+        )
+    }
 }

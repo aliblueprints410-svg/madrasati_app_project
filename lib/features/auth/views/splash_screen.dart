@@ -11,7 +11,7 @@ import '../../teacher/views/teacher_dashboard_screen.dart';
 import '../../onboarding/views/intro_walkthrough_screen.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+  const SplashScreen({super.key});
 
   @override
   ConsumerState<SplashScreen> createState() => _SplashScreenState();
@@ -53,8 +53,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _checkAuth() async {
+    // Request push notification permission safely once activity is displayed
+    try {
+      await ref.read(notificationServiceProvider).requestPermission();
+    } catch (_) {}
+
     // Elegant delay so user enjoys the splash transition
-    await Future.delayed(const Duration(milliseconds: 2400));
+    await Future.delayed(const Duration(milliseconds: 2000));
 
     if (!mounted) return;
 
@@ -63,6 +68,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     // Check if Teacher is logged in
     if (supabaseAuth.currentUser != null) {
+      final metaSchoolId = supabaseAuth.currentUser!.userMetadata?['school_id']?.toString();
+      if (metaSchoolId != null && metaSchoolId.isNotEmpty) {
+        await localStorage.saveSchoolCode(metaSchoolId);
+      }
+      if (!mounted) return;
       _navigate(const TeacherDashboardScreen());
       return;
     }
@@ -71,8 +81,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     final schoolCode = localStorage.getSchoolCode();
 
     if (schoolCode != null && schoolCode.isNotEmpty) {
-      ref.read(notificationServiceProvider).subscribeToSchool(schoolCode);
       final gradeId = localStorage.getSelectedGrade();
+      ref.read(notificationServiceProvider).subscribeToSchool(schoolCode, classId: gradeId);
       if (gradeId != null && gradeId.isNotEmpty) {
         _navigate(const MainScreen());
       } else {
@@ -148,7 +158,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         height: 160,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: AppColors.primary.withOpacity(0.15),
+                          color: AppColors.primary.withValues(alpha: 0.15),
                         ),
                       ),
                       Container(
@@ -156,28 +166,29 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         height: 130,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: AppColors.primary.withOpacity(0.25),
+                          color: AppColors.primary.withValues(alpha: 0.25),
                         ),
                       ),
                       // Core Icon Card
                       Container(
-                        width: 100,
-                        height: 100,
+                        width: 108,
+                        height: 108,
                         decoration: BoxDecoration(
-                          gradient: AppColors.primaryGradient,
                           borderRadius: BorderRadius.circular(28),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withOpacity(0.4),
-                              blurRadius: 24,
+                              color: AppColors.primary.withValues(alpha: 0.4),
+                              blurRadius: 28,
                               offset: const Offset(0, 10),
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          Icons.school_rounded,
-                          size: 52,
-                          color: Colors.white,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(28),
+                          child: Image.asset(
+                            'assets/images/app_icon.png',
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                     ],
@@ -204,9 +215,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
                       ),
                       child: Text(
                         'منصتك التعليمية الذكية والمتكاملة',

@@ -11,7 +11,7 @@ import '../providers/announcement_providers.dart';
 class AnnouncementDetailsScreen extends ConsumerStatefulWidget {
   final Announcement announcement;
 
-  const AnnouncementDetailsScreen({Key? key, required this.announcement}) : super(key: key);
+  const AnnouncementDetailsScreen({super.key, required this.announcement});
 
   @override
   ConsumerState<AnnouncementDetailsScreen> createState() => _AnnouncementDetailsScreenState();
@@ -32,23 +32,32 @@ class _AnnouncementDetailsScreenState extends ConsumerState<AnnouncementDetailsS
 
     setState(() => _isSubmitting = true);
     try {
+      final supabase = ref.read(supabaseClientProvider);
       final localStorage = ref.read(localStorageServiceProvider);
-      var studentName = localStorage.getStudentName()?.trim();
-      if (studentName == null || studentName.isEmpty) {
-        studentName = 'طالب';
+      String senderName;
+      if (supabase.auth.currentUser != null) {
+        senderName = 'الأستاذ 👨‍🏫';
+      } else {
+        senderName = localStorage.getStudentName()?.trim() ?? '';
+        if (senderName.isEmpty) {
+          senderName = 'طالب';
+        }
       }
 
       final comment = Comment(
         id: const Uuid().v4(),
         announcementId: widget.announcement.id,
-        senderName: studentName,
+        senderName: senderName,
         content: _commentController.text.trim(),
         createdAt: DateTime.now(),
       );
 
       await ref.read(announcementServiceProvider).addComment(comment);
+      ref.invalidate(commentsProvider(widget.announcement.id));
       _commentController.clear();
-      FocusScope.of(context).unfocus();
+      if (mounted) {
+        FocusScope.of(context).unfocus();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -66,7 +75,6 @@ class _AnnouncementDetailsScreenState extends ConsumerState<AnnouncementDetailsS
   @override
   Widget build(BuildContext context) {
     final commentsAsync = ref.watch(commentsProvider(widget.announcement.id));
-    final formatter = DateFormat('yyyy-MM-dd HH:mm');
     final isPriority = widget.announcement.priority;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -101,7 +109,7 @@ class _AnnouncementDetailsScreenState extends ConsumerState<AnnouncementDetailsS
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
                         blurRadius: 16,
                         offset: const Offset(0, 6),
                       ),
@@ -114,7 +122,7 @@ class _AnnouncementDetailsScreenState extends ConsumerState<AnnouncementDetailsS
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444).withOpacity(0.15),
+                            color: const Color(0xFFEF4444).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Row(
@@ -217,16 +225,22 @@ class _AnnouncementDetailsScreenState extends ConsumerState<AnnouncementDetailsS
                       itemCount: comments.length,
                       itemBuilder: (context, index) {
                         final comment = comments[index];
+                        final isTeacherReply = comment.senderName.contains('الأستاذ') ||
+                            comment.senderName.contains('إدارة');
                         final initial = comment.senderName.isNotEmpty ? comment.senderName[0] : 'ط';
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 10),
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: isDark ? AppColors.darkCard : Colors.white,
+                            color: isTeacherReply
+                                ? AppColors.primary.withValues(alpha: isDark ? 0.18 : 0.07)
+                                : (isDark ? AppColors.darkCard : Colors.white),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                              color: isTeacherReply
+                                  ? AppColors.primary.withValues(alpha: 0.45)
+                                  : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
                             ),
                           ),
                           child: Row(
@@ -234,11 +248,13 @@ class _AnnouncementDetailsScreenState extends ConsumerState<AnnouncementDetailsS
                             children: [
                               CircleAvatar(
                                 radius: 18,
-                                backgroundColor: AppColors.primary.withOpacity(0.15),
-                                child: Text(
-                                  initial,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
-                                ),
+                                backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                                child: isTeacherReply
+                                    ? const Icon(Icons.school_rounded, size: 18, color: AppColors.primary)
+                                    : Text(
+                                        initial,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                                      ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -248,9 +264,35 @@ class _AnnouncementDetailsScreenState extends ConsumerState<AnnouncementDetailsS
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(
-                                          comment.senderName,
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              comment.senderName,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                                color: isTeacherReply ? AppColors.primary : null,
+                                              ),
+                                            ),
+                                            if (isTeacherReply) ...[
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.primary.withValues(alpha: 0.15),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Text(
+                                                  'رد الأستاذ',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
                                         ),
                                         Text(
                                           DateFormat('HH:mm').format(comment.createdAt),
@@ -299,7 +341,7 @@ class _AnnouncementDetailsScreenState extends ConsumerState<AnnouncementDetailsS
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 8,
                   offset: const Offset(0, -2),
                 ),

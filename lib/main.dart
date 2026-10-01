@@ -49,7 +49,7 @@ void main() async {
 }
 
 class SchoolApp extends ConsumerWidget {
-  const SchoolApp({Key? key}) : super(key: key);
+  const SchoolApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

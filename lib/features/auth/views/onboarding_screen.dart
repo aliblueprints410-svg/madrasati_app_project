@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/qr_code_scanner_sheet.dart';
 import '../providers/auth_providers.dart';
 import 'teacher_login_screen.dart';
 import '../../homework/views/grade_selection_screen.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
-  const OnboardingScreen({Key? key}) : super(key: key);
+  const OnboardingScreen({super.key});
 
   @override
   ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -25,6 +26,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
+  Future<void> _scanQrCode() async {
+    final scanned = await QrCodeScannerSheet.scan(context);
+    if (scanned != null && scanned.trim().isNotEmpty && mounted) {
+      setState(() {
+        _codeController.text = scanned.trim();
+      });
+      await _submit();
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -37,8 +48,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       if (school != null) {
         final localStorage = ref.read(localStorageServiceProvider);
         await localStorage.saveSchoolCode(school.id);
+        await localStorage.saveSchoolName(school.name);
+        await localStorage.saveSchoolShortCode(school.schoolCode);
         await localStorage.saveStudentName('طالبنا العزيز');
         ref.read(notificationServiceProvider).subscribeToSchool(school.id);
+        ref.invalidate(activeSchoolProvider);
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -63,7 +77,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             content: const Row(
               children: [
                 Icon(Icons.error_outline_rounded, color: Colors.white),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Text('كود المدرسة غير صحيح! يرجى التأكد من الكود.'),
               ],
             ),
@@ -117,7 +131,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           borderRadius: BorderRadius.circular(26),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withOpacity(0.35),
+                              color: AppColors.primary.withValues(alpha: 0.35),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
@@ -167,14 +181,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       onFieldSubmitted: (_) => _submit(),
                       decoration: InputDecoration(
                         hintText: 'أدخل الكود (مثال: SCH-1)',
-                        prefixIcon: Container(
-                          margin: const EdgeInsets.all(12),
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
+                        prefixIcon: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Material(
+                            color: AppColors.primary.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(10),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(10),
+                              onTap: _scanQrCode,
+                              child: const Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: Icon(
+                                  Icons.qr_code_scanner_rounded,
+                                  color: AppColors.primary,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
                           ),
-                          child: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primary, size: 20),
                         ),
                       ),
                       validator: (value) {
@@ -194,7 +218,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         backgroundColor: AppColors.primary,
                         elevation: 4,
-                        shadowColor: AppColors.primary.withOpacity(0.4),
+                        shadowColor: AppColors.primary.withValues(alpha: 0.4),
                       ),
                       child: _isLoading
                           ? const SizedBox(

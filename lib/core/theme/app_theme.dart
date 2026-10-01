@@ -3,8 +3,19 @@ import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 class AppTheme {
+  static const List<FontFeature> _noLigatures = [
+    FontFeature.disable('liga'),
+    FontFeature.disable('clig'),
+    FontFeature.disable('dlig'),
+    FontFeature.disable('calt'),
+  ];
+
   static ThemeData get lightTheme {
     final baseTextTheme = ThemeData.light().textTheme;
+    final cairoTheme = GoogleFonts.cairoTextTheme(baseTextTheme).apply(
+      bodyColor: AppColors.lightTextPrimary,
+      displayColor: AppColors.lightTextPrimary,
+    );
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
@@ -14,26 +25,29 @@ class AppTheme {
         primary: AppColors.primary,
         secondary: AppColors.secondary,
         surface: AppColors.lightSurface,
-        background: AppColors.lightBackground,
         error: AppColors.error,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onSurface: AppColors.lightTextPrimary,
-        onBackground: AppColors.lightTextPrimary,
       ),
-      textTheme: GoogleFonts.cairoTextTheme(baseTextTheme).apply(
-        bodyColor: AppColors.lightTextPrimary,
-        displayColor: AppColors.lightTextPrimary,
+      textTheme: cairoTheme.copyWith(
+        bodyLarge: const TextStyle(
+          fontFamily: 'sans-serif',
+          fontSize: 16,
+          color: AppColors.lightTextPrimary,
+          fontFeatures: _noLigatures,
+        ),
       ),
       appBarTheme: AppBarTheme(
-        centerTitle: true,
+        centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 2,
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.lightBackground,
+        surfaceTintColor: AppColors.lightBackground,
         foregroundColor: AppColors.lightTextPrimary,
         iconTheme: const IconThemeData(color: AppColors.lightTextPrimary, size: 24),
         titleTextStyle: GoogleFonts.cairo(
-          fontSize: 20,
+          fontSize: 18,
           fontWeight: FontWeight.w700,
           color: AppColors.lightTextPrimary,
         ),
@@ -50,7 +64,7 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 2,
-          shadowColor: AppColors.primary.withOpacity(0.35),
+          shadowColor: AppColors.primary.withValues(alpha: 0.35),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
@@ -105,6 +119,10 @@ class AppTheme {
 
   static ThemeData get darkTheme {
     final baseTextTheme = ThemeData.dark().textTheme;
+    final cairoDarkTheme = GoogleFonts.cairoTextTheme(baseTextTheme).apply(
+      bodyColor: AppColors.darkTextPrimary,
+      displayColor: AppColors.darkTextPrimary,
+    );
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
@@ -114,26 +132,29 @@ class AppTheme {
         primary: AppColors.primaryLight,
         secondary: AppColors.secondary,
         surface: AppColors.darkSurface,
-        background: AppColors.darkBackground,
         error: AppColors.error,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onSurface: AppColors.darkTextPrimary,
-        onBackground: AppColors.darkTextPrimary,
       ),
-      textTheme: GoogleFonts.cairoTextTheme(baseTextTheme).apply(
-        bodyColor: AppColors.darkTextPrimary,
-        displayColor: AppColors.darkTextPrimary,
+      textTheme: cairoDarkTheme.copyWith(
+        bodyLarge: const TextStyle(
+          fontFamily: 'sans-serif',
+          fontSize: 16,
+          color: AppColors.darkTextPrimary,
+          fontFeatures: _noLigatures,
+        ),
       ),
       appBarTheme: AppBarTheme(
-        centerTitle: true,
+        centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 2,
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.darkBackground,
+        surfaceTintColor: AppColors.darkBackground,
         foregroundColor: AppColors.darkTextPrimary,
         iconTheme: const IconThemeData(color: AppColors.darkTextPrimary, size: 24),
         titleTextStyle: GoogleFonts.cairo(
-          fontSize: 20,
+          fontSize: 18,
           fontWeight: FontWeight.w700,
           color: AppColors.darkTextPrimary,
         ),
@@ -150,7 +171,7 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 3,
-          shadowColor: AppColors.primaryLight.withOpacity(0.4),
+          shadowColor: AppColors.primaryLight.withValues(alpha: 0.4),
           backgroundColor: AppColors.primaryLight,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
