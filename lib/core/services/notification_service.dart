@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:onesignal_flutter/onesignal_flutter.dart';
+import 'web_notification_helper.dart' as web_notify;
 
 final notificationServiceProvider = Provider<NotificationService>((ref) {
   return NotificationService();
@@ -15,7 +16,7 @@ class NotificationService {
   String get _restApiKey => dotenv.env['ONESIGNAL_REST_API_KEY'] ?? '';
 
   bool get _isSupportedPlatform {
-    if (kIsWeb) return false;
+    if (kIsWeb) return true;
     try {
       return Platform.isAndroid || Platform.isIOS;
     } catch (_) {
@@ -23,8 +24,13 @@ class NotificationService {
     }
   }
 
-  /// Initialize OneSignal SDK on supported platforms (Android / iOS)
+  /// Initialize OneSignal SDK on supported platforms (Android / iOS / Web)
   Future<void> initialize() async {
+    if (kIsWeb) {
+      debugPrint('[NotificationService] Running on Web - OneSignal Web SDK initialized via page scripts.');
+      return;
+    }
+
     if (!_isSupportedPlatform) {
       debugPrint('[NotificationService] OneSignal is only supported on Android and iOS.');
       return;
@@ -58,6 +64,9 @@ class NotificationService {
 
   /// Explicitly prompt the user for notification permissions (can be called from UI when mounted)
   Future<bool> requestPermission() async {
+    if (kIsWeb) {
+      return await web_notify.requestWebNotificationPermission();
+    }
     if (!_isSupportedPlatform) return false;
     try {
       final granted = await OneSignal.Notifications.requestPermission(true);
@@ -71,6 +80,7 @@ class NotificationService {
 
   /// Check if notification permission is currently granted
   bool get hasNotificationPermission {
+    if (kIsWeb) return true;
     if (!_isSupportedPlatform) return false;
     try {
       return OneSignal.Notifications.permission;
@@ -81,6 +91,7 @@ class NotificationService {
 
   /// Check push subscription status
   bool get isSubscribed {
+    if (kIsWeb) return true;
     if (!_isSupportedPlatform) return false;
     try {
       return OneSignal.User.pushSubscription.optedIn ?? false;
@@ -115,6 +126,10 @@ class NotificationService {
 
   /// Subscribe the device to a specific school and optionally a specific class
   Future<void> subscribeToSchool(String schoolCode, {String? classId}) async {
+    if (kIsWeb) {
+      await web_notify.setWebUserTags(schoolCode, classId: classId);
+      return;
+    }
     if (!_isSupportedPlatform || _appId.isEmpty) return;
     try {
       final cleanSchool = schoolCode.trim().toUpperCase();
@@ -130,6 +145,10 @@ class NotificationService {
 
   /// Subscribe or update the specific class tag for the student
   Future<void> subscribeToClass({required String schoolCode, required String classId}) async {
+    if (kIsWeb) {
+      await web_notify.setWebUserTags(schoolCode, classId: classId);
+      return;
+    }
     if (!_isSupportedPlatform || _appId.isEmpty) return;
     try {
       final cleanSchool = schoolCode.trim().toUpperCase();
@@ -144,6 +163,10 @@ class NotificationService {
 
   /// Unsubscribe device when logging out
   Future<void> unsubscribeFromSchool() async {
+    if (kIsWeb) {
+      await web_notify.removeWebUserTags();
+      return;
+    }
     if (!_isSupportedPlatform || _appId.isEmpty) return;
     try {
       await OneSignal.User.removeTag('school_code');
