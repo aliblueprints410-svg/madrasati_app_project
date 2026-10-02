@@ -1,38 +1,374 @@
 <!DOCTYPE html>
-<html>
+<html dir="rtl" lang="ar">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="تطبيق مدرستي - المنصة المدرسية المتكاملة للطلاب والأساتذة">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="school_app">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="مدرستي">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>school_app</title>
+  <title>تطبيق مدرستي</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #0b132b;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", "Tajawal", Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* PWA Install Sheet Modal / Banner */
+    #pwa-install-overlay {
+      display: none;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      top: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 999999;
+      justify-content: center;
+      align-items: flex-end;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    .install-card {
+      background: linear-gradient(145deg, #131d3b, #0c1427);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 28px 28px 0 0;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+      padding: 24px 22px 28px 22px;
+      color: #ffffff;
+      box-sizing: border-box;
+      animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+
+    .install-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .install-header img {
+      width: 58px;
+      height: 58px;
+      border-radius: 16px;
+      box-shadow: 0 4px 15px rgba(37, 99, 235, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .install-header-text h3 {
+      margin: 0 0 4px 0;
+      font-size: 19px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .install-header-text p {
+      margin: 0;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: #94a3b8;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .close-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+
+    /* iOS Instructions */
+    .ios-steps {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+    }
+
+    .ios-step-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      font-size: 14px;
+      line-height: 1.4;
+      color: #e2e8f0;
+    }
+
+    .ios-step-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .step-badge {
+      background: #2563eb;
+      color: #fff;
+      font-weight: 700;
+      font-size: 12px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .ios-icon-inline {
+      display: inline-flex;
+      vertical-align: middle;
+      background: rgba(255, 255, 255, 0.15);
+      padding: 2px 6px;
+      border-radius: 6px;
+      margin: 0 4px;
+    }
+
+    .install-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn-install {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: white;
+      border: none;
+      padding: 14px 20px;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+      transition: all 0.2s;
+    }
+
+    .btn-install:active {
+      transform: scale(0.98);
+    }
+
+    .btn-dismiss {
+      background: transparent;
+      color: #94a3b8;
+      border: none;
+      padding: 8px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .btn-dismiss:hover {
+      color: #e2e8f0;
+    }
+
+    /* iOS Bouncing Arrow Indicator at bottom */
+    .ios-pointer {
+      text-align: center;
+      margin-top: 14px;
+      color: #60a5fa;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      animation: bounce 1.4s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(6px); }
+    }
+  </style>
 </head>
 <body>
+  <!-- PWA Install Prompt Banner / Bottom Sheet -->
+  <div id="pwa-install-overlay">
+    <div class="install-card">
+      <button class="close-btn" onclick="dismissPwaPrompt()">✕</button>
+
+      <div class="install-header">
+        <img src="favicon.png" alt="مدرستي">
+        <div class="install-header-text">
+          <h3>تثبيت تطبيق مدرستي</h3>
+          <p>ثبّت التطبيق على شاشتك لتجربة سريعة وسلسة كأي تطبيق أصلي</p>
+        </div>
+      </div>
+
+      <!-- Content for iOS Safari -->
+      <div id="ios-install-content" style="display: none;">
+        <div class="ios-steps">
+          <div class="ios-step-item">
+            <span class="step-badge">1</span>
+            <span>اضغط على زر المشاركة 
+              <span class="ios-icon-inline">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                  <polyline points="16 6 12 2 8 6"></polyline>
+                  <line x1="12" y1="2" x2="12" y2="15"></line>
+                </svg>
+              </span>
+              في أسفل الشاشة.
+            </span>
+          </div>
+          <div class="ios-step-item">
+            <span class="step-badge">2</span>
+            <span>مرر للأسفل واختر <b>"إضافة إلى الشاشة الرئيسية" 📲</b></span>
+          </div>
+          <div class="ios-step-item">
+            <span class="step-badge">3</span>
+            <span>اضغط على <b>"إضافة" (Add)</b> في أعلى يمين الشاشة.</span>
+          </div>
+        </div>
+
+        <div class="ios-pointer">
+          <span>انظر لأسفل المتصفح واضغط زر المشاركة ⬇️</span>
+        </div>
+      </div>
+
+      <!-- Content for Android / Chrome / Edge -->
+      <div id="android-install-content" style="display: none;">
+        <div class="install-actions">
+          <button class="btn-install" id="btn-trigger-install" onclick="triggerAndroidInstall()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            تثبيت التطبيق الآن
+          </button>
+          <button class="btn-dismiss" onclick="dismissPwaPrompt()">المتابعة عبر المتصفح</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let deferredPrompt = null;
+
+    // Detect if already installed and opened as standalone
+    function isRunningStandalone() {
+      return (window.navigator.standalone === true) || 
+             (window.matchMedia('(display-mode: standalone)').matches) ||
+             (window.matchMedia('(display-mode: fullscreen)').matches);
+    }
+
+    // Detect if iOS (iPhone/iPad/iPod)
+    function isIos() {
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      return /iphone|ipad|ipod/.test(userAgent) || 
+             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
+
+    function showInstallPrompt() {
+      // If already installed as app, never show
+      if (isRunningStandalone()) {
+        return;
+      }
+
+      // Check if user dismissed it in this browser session
+      if (sessionStorage.getItem('pwa_prompt_dismissed') === 'true') {
+        return;
+      }
+
+      const overlay = document.getElementById('pwa-install-overlay');
+      const iosContent = document.getElementById('ios-install-content');
+      const androidContent = document.getElementById('android-install-content');
+
+      if (isIos()) {
+        iosContent.style.display = 'block';
+        androidContent.style.display = 'none';
+        overlay.style.display = 'flex';
+      } else {
+        androidContent.style.display = 'block';
+        iosContent.style.display = 'none';
+        overlay.style.display = 'flex';
+      }
+    }
+
+    function dismissPwaPrompt() {
+      document.getElementById('pwa-install-overlay').style.display = 'none';
+      sessionStorage.setItem('pwa_prompt_dismissed', 'true');
+    }
+
+    // Listen for Chrome/Android install event
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      showInstallPrompt();
+    });
+
+    function triggerAndroidInstall() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            dismissPwaPrompt();
+          }
+          deferredPrompt = null;
+        });
+      } else {
+        alert('لتثبيت التطبيق، اضغط على زر خيارات المتصفح (⋮) في الأعلى ثم اختر "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية".');
+      }
+    }
+
+    // On page load, if iOS and not standalone, show after a tiny delay
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        if (!isRunningStandalone()) {
+          showInstallPrompt();
+        }
+      }, 1200);
+    });
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
