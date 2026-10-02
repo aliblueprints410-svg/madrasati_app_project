@@ -21,6 +21,69 @@
   <title>تطبيق مدرستي</title>
   <link rel="manifest" href="manifest.json">
 
+  <!-- OneSignal Web Push SDK -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      try {
+        await OneSignal.init({
+          appId: "99d02178-b430-4c8f-bb10-3620f9fd82c6",
+          serviceWorkerParam: { scope: "/madrasati_app_project/" },
+          serviceWorkerPath: "/madrasati_app_project/OneSignalSDKWorker.js",
+          allowLocalhostAsSecureOrigin: true,
+          notifyButton: {
+            enable: false,
+          },
+        });
+        console.log("[OneSignal] Web SDK initialized successfully.");
+      } catch (err) {
+        console.warn("[OneSignal] Init warning:", err);
+      }
+    });
+
+    // Helper functions exposed for Flutter Dart interop
+    window.requestWebNotificationPermission = async function() {
+      try {
+        if (window.OneSignal && window.OneSignal.Notifications) {
+          await window.OneSignal.Notifications.requestPermission();
+          return Boolean(window.OneSignal.Notifications.permission);
+        } else if ('Notification' in window) {
+          const permission = await Notification.requestPermission();
+          return permission === 'granted';
+        }
+      } catch (e) {
+        console.error("requestWebNotificationPermission error:", e);
+      }
+      return false;
+    };
+
+    window.setWebUserTags = async function(schoolCode, classId) {
+      try {
+        if (window.OneSignal && window.OneSignal.User) {
+          const tags = {};
+          if (schoolCode) tags['school_code'] = String(schoolCode).trim().toUpperCase();
+          if (classId) tags['class_id'] = String(classId).trim();
+          await window.OneSignal.User.addTags(tags);
+          console.log("[OneSignal] Web tags set:", tags);
+        }
+      } catch (e) {
+        console.error("setWebUserTags error:", e);
+      }
+    };
+
+    window.removeWebUserTags = async function() {
+      try {
+        if (window.OneSignal && window.OneSignal.User) {
+          await window.OneSignal.User.removeTags(['school_code', 'class_id']);
+          console.log("[OneSignal] Web tags removed");
+        }
+      } catch (e) {
+        console.error("removeWebUserTags error:", e);
+      }
+    };
+  </script>
+
   <style>
     body {
       margin: 0;
@@ -129,7 +192,7 @@
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 18px;
       padding: 14px 16px;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
 
     .ios-step-item {
@@ -179,7 +242,7 @@
       background: linear-gradient(135deg, #2563eb, #1d4ed8);
       color: white;
       border: none;
-      padding: 14px 20px;
+      padding: 13px 20px;
       border-radius: 14px;
       font-size: 15px;
       font-weight: 700;
@@ -194,6 +257,27 @@
 
     .btn-install:active {
       transform: scale(0.98);
+    }
+
+    .btn-notify {
+      background: rgba(37, 99, 235, 0.15);
+      color: #93c5fd;
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      padding: 12px 18px;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn-notify:hover {
+      background: rgba(37, 99, 235, 0.25);
+      color: #bfdbfe;
     }
 
     .btn-dismiss {
@@ -213,7 +297,7 @@
     /* iOS Bouncing Arrow Indicator at bottom */
     .ios-pointer {
       text-align: center;
-      margin-top: 14px;
+      margin-top: 10px;
       color: #60a5fa;
       font-size: 12px;
       display: flex;
@@ -238,7 +322,7 @@
         <img src="favicon.png" alt="مدرستي">
         <div class="install-header-text">
           <h3>تثبيت تطبيق مدرستي</h3>
-          <p>ثبّت التطبيق على شاشتك لتجربة سريعة وسلسة كأي تطبيق أصلي</p>
+          <p>ثبّت التطبيق على شاشتك لتجربة سريعة وسلسة مع تفعيل الإشعارات</p>
         </div>
       </div>
 
@@ -268,6 +352,13 @@
           </div>
         </div>
 
+        <div class="install-actions">
+          <button class="btn-notify" onclick="enableWebNotifications()">
+            🔔 تفعيل إشعارات شاشة القفل الآن
+          </button>
+          <button class="btn-dismiss" onclick="dismissPwaPrompt()">المتابعة عبر المتصفح</button>
+        </div>
+
         <div class="ios-pointer">
           <span>انظر لأسفل المتصفح واضغط زر المشاركة ⬇️</span>
         </div>
@@ -283,6 +374,9 @@
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
             تثبيت التطبيق الآن
+          </button>
+          <button class="btn-notify" onclick="enableWebNotifications()">
+            🔔 تفعيل التنبيهات والإشعارات
           </button>
           <button class="btn-dismiss" onclick="dismissPwaPrompt()">المتابعة عبر المتصفح</button>
         </div>
@@ -308,7 +402,7 @@
     }
 
     function showInstallPrompt() {
-      // If already installed as app, never show
+      // If already installed as app, check if notifications allowed, otherwise don't bother
       if (isRunningStandalone()) {
         return;
       }
@@ -338,6 +432,15 @@
       sessionStorage.setItem('pwa_prompt_dismissed', 'true');
     }
 
+    async function enableWebNotifications() {
+      const granted = await window.requestWebNotificationPermission();
+      if (granted) {
+        alert('✅ تم تفعيل الإشعارات بنجاح! ستصلك تنبيهات الواجبات والدرجات.');
+      } else {
+        alert('⚠️ يرجى الضغط على "سماح" (Allow) في نافذة المتصفح لتفعيل التنبيهات.');
+      }
+    }
+
     // Listen for Chrome/Android install event
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
@@ -359,7 +462,7 @@
       }
     }
 
-    // On page load, if iOS and not standalone, show after a tiny delay
+    // On page load, if not standalone, show prompt after a tiny delay
     window.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => {
         if (!isRunningStandalone()) {
